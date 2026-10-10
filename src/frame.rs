@@ -202,11 +202,13 @@ impl<'a> TitleBar<'a> {
             buttons_left = buttons.min_rect().left() - CONTROLS_GAP;
         }
         let mut right_ui = child(ui, row.with_max_x(buttons_left), egui::Layout::right_to_left(egui::Align::Center));
+        steady_controls(&mut right_ui);
         right(&mut right_ui);
         let right_width = (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
         let mut left_ui = child(ui, left_rect, egui::Layout::left_to_right(egui::Align::Center));
+        steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
         let measured = |ui: &mut egui::Ui| {
             left(ui);
@@ -233,6 +235,18 @@ impl<'a> TitleBar<'a> {
             let pos = bar.center() - galley.size() / 2.0;
             ui.painter().galley(pos, galley, style.title_text);
         }
+    }
+}
+
+/// Takes the strokes off the bar's controls. egui draws an idle toggle
+/// (`selectable_label`) without a frame and a hovered one with a framed
+/// stroke, and the stroke adds to the widget's size, so with a skin that
+/// strokes its controls, hovering one widened it and pushed its
+/// neighbours along. Without strokes, hovering changes only the fill.
+fn steady_controls(ui: &mut egui::Ui) {
+    let w = &mut ui.visuals_mut().widgets;
+    for state in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
+        state.bg_stroke.width = 0.0;
     }
 }
 
@@ -484,5 +498,59 @@ mod tests {
         assert_eq!(edge_at(w, egui::pos2(400.0, 300.0)), None);
         assert_eq!(edge_at(w, egui::pos2(10.0, 10.0)), None);
         assert_eq!(edge_at(w, egui::pos2(-1.0, 300.0)), None);
+    }
+}
+
+#[cfg(test)]
+mod hover_tests {
+    use super::*;
+
+    /// Draws a bar with menus on the left and toggles and buttons on the
+    /// right, and returns every control's rect.
+    fn rects(ctx: &egui::Context, t: f64, events: Vec<egui::Event>) -> Vec<egui::Rect> {
+        let input = egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1100.0, 700.0))),
+            time: Some(t),
+            events,
+            ..Default::default()
+        };
+        let (mut left, mut right) = (Vec::new(), Vec::new());
+        let _ = ctx.run_ui(input, |ui| {
+            let style = FrameStyle::from_visuals(ui.visuals());
+            egui::Panel::top("bar").frame(header_frame(ui.style(), &style, 0)).show(ui, |ui| {
+                TitleBar::new("Title", &style).menu_bar(true).show(
+                    ui,
+                    |ui| {
+                        for m in ["File", "Edit", "View"] {
+                            left.push(ui.menu_button(m, |_| {}).response.rect);
+                        }
+                    },
+                    |ui| {
+                        right.push(ui.selectable_label(false, "Markdown").rect);
+                        right.push(ui.button("Insert").rect);
+                        right.push(ui.selectable_label(false, "B").rect);
+                        right.push(ui.selectable_label(true, "I").rect);
+                        right.push(ui.menu_button("Aa", |_| {}).response.rect);
+                    },
+                );
+            });
+        });
+        left.extend(right);
+        left
+    }
+
+    #[test]
+    fn hovering_a_control_moves_nothing_even_with_stroked_skins() {
+        let ctx = egui::Context::default();
+        // Dark Orange strokes its controls, which is what used to shift them.
+        crate::skin::Skin::parse(crate::skin::BUILT_IN[0].1).unwrap().apply(&ctx);
+        let rest = rects(&ctx, 0.1, vec![]);
+        let rest = rects(&ctx, 0.2, vec![egui::Event::PointerGone]).into_iter().zip(rest).map(|(a, _)| a).collect::<Vec<_>>();
+        for (i, r) in rest.iter().enumerate() {
+            let t = 1.0 + i as f64;
+            rects(&ctx, t, vec![egui::Event::PointerMoved(r.center())]);
+            let hovered = rects(&ctx, t + 0.1, vec![]);
+            assert_eq!(hovered, rest, "hovering control {i} moved the others");
+        }
     }
 }
