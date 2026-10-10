@@ -13,6 +13,10 @@ name = "patina"
 
 [dependencies]
 egui = "0.35"
+dirs = "7"
+serde = { version = "1", features = ["derive"] }
+serde_ignored = "0.1"
+toml = "1"
 zbus = "5"
 
 [dev-dependencies]

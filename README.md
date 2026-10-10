@@ -38,6 +38,8 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`frame`**: the app's own window frame, with a header bar, GNOME-style window controls, resize
   edges and rounded corners. Moving and resizing go to the compositor.
 - **`appearance`**: follows the desktop's light/dark setting through the XDG portal.
+- **`theme`**: themes in the suite format, which every app reads, with app sections, a shared
+  user folder and the built-in Dark Orange. See [docs/themes.md](docs/themes.md).
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
 
@@ -48,7 +50,7 @@ make              # list targets
 make gallery      # every component on one screen
 make test         # tests
 make check        # tests and clippy
-make screenshot   # docs/gallery-{light,dark}.png
+make screenshot   # docs/gallery-*.png
 ```
 
 Decisions are recorded as ADRs in [docs/adr](docs/adr/README.md), and we recommend the same for

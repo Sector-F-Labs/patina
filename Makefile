@@ -27,9 +27,10 @@ doc: ## Build the API docs and open them
 	cargo doc --no-deps --open
 
 # The docs screenshots, light and dark, with the tree rooted at this repo.
-screenshot: ## Regenerate docs/gallery-light.png and docs/gallery-dark.png
+screenshot: ## Regenerate the docs/gallery-*.png screenshots
 	PATINA_ROOT=$(CURDIR) PATINA_THEME=light PATINA_SCREENSHOT=docs/gallery-light.png cargo run --example gallery
 	PATINA_ROOT=$(CURDIR) PATINA_THEME=dark PATINA_SCREENSHOT=docs/gallery-dark.png cargo run --example gallery
+	PATINA_ROOT=$(CURDIR) PATINA_THEME="Dark Orange" PATINA_SCREENSHOT=docs/gallery-dark-orange.png cargo run --example gallery
 
 clean: ## Remove build output
 	cargo clean

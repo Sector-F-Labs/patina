@@ -56,19 +56,20 @@ Implemented by `patina::frame`.
 
 ## Themes
 
-The theme format is UnAmp's suite format (UnAmp ADR-0024), coming to Patina in a later step:
+Implemented by `patina::theme`. The format is documented in [themes.md](themes.md).
 
-- A `format` version.
-- Shared sections every app reads: `[colors]`, `[controls]`, `[window]` and `[window.controls]`.
-- One `[app.<name>]` section per app.
-- Keys are named for a role (`surface`, `pressed`, `title_bar`), not for a widget or an app
-  feature.
-
-A theme written for one app can be dropped into another. The shared look carries over, and each
-app's own section waits until that app reads the file.
-
-Until then, `FrameStyle::from_visuals` gives the unskinned frame, and an app with themes overrides
-its fields.
+- **Same files in every app:** themes use the suite format, with a `format` version, shared
+  `[colors]`, `[controls]` and `[window]` sections, and one `[app.<name>]` section per app.
+  - Keys are named for a role (`surface`, `pressed`, `title_bar`), not for a widget or an app
+    feature.
+- **Where they come from:**
+  - **Default:** stock egui, following the desktop.
+  - **Patina's built-ins:** Dark Orange, Photograph's look.
+  - **The app's own built-ins.**
+  - **The user's themes:** in `~/.config/patina/themes/`, shared by every app.
+- **Within the rules:** a theme dropped into any app brings its shared look with it. The app's
+  own section waits until that app reads the file. This is how an app can look completely
+  different from its siblings while sharing everything else.
 
 ## Components
 
@@ -76,6 +77,7 @@ its fields.
 |--------|------|------|
 | `frame` | Own window frame: header bar, window buttons, edges, compositor hand-off | UnAmp, Photograph |
 | `appearance` | Follow the desktop's light/dark setting (XDG portal) | UnAmp, Photograph |
+| `theme` | Suite theme format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
 | `tree` | Lazily loaded sidebar folder tree | UnAmp |
 
 Run `make gallery` to see each one. A component belongs in Patina when a second app wants it.

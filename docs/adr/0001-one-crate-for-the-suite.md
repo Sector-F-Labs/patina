@@ -40,7 +40,7 @@ We will build Patina as one library crate in `com/sectorflabs/patina`.
 - **What goes in:** a component goes in when a second app wants it, and it uses only std, egui
   and small helper crates (zbus for the portal), never an app's own types. It starts with
   `frame`, `appearance` and `tree`, each moved from UnAmp, the more developed copy.
-  - **Later steps:** the theme loader (the suite format), and maybe mount discovery behind a
+  - **Later steps:** the theme loader ([ADR-0004](0004-themes-in-patina.md)), and maybe mount discovery behind a
     feature.
 - **What stays out:** app-specific parts such as UnAmp's classic `.wsz` renderer, playlist
   reordering and window tiling.

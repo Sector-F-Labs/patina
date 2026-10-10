@@ -4,13 +4,15 @@
 //! how to use the frame (see the steps in `patina::frame`).
 //!
 //! With `PATINA_SCREENSHOT` set to a PNG path it saves a screenshot of its
-//! window there and quits (`make screenshot`). `PATINA_THEME=light|dark`
-//! picks the theme, and `PATINA_ROOT` the folder tree's root (default: home).
+//! window there and quits (`make screenshot`). `PATINA_THEME` picks the
+//! theme: `light`, `dark` or a theme's name. `PATINA_ROOT` sets the folder
+//! tree's root (default: home).
 
 use std::path::PathBuf;
 
 use eframe::egui;
 use patina::frame::{self, FrameStyle, TitleBar};
+use patina::theme::{self, Theme};
 use patina::tree::FolderTree;
 
 fn main() -> eframe::Result {
@@ -30,6 +32,13 @@ fn main() -> eframe::Result {
 
 struct Gallery {
     custom_frame: bool,
+    themes: Vec<Theme>,
+    /// Index into `themes`.
+    theme: usize,
+    /// Light, dark or following the desktop, while the theme is Default.
+    light_dark: egui::ThemePreference,
+    /// Problems loading themes, shown in the Theme menu.
+    theme_errors: Vec<String>,
     tree: FolderTree,
     current: PathBuf,
     text: String,
@@ -43,18 +52,25 @@ struct Gallery {
 impl Gallery {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         patina::appearance::watch(&cc.egui_ctx);
-        match std::env::var("PATINA_THEME").as_deref() {
-            Ok("light") => cc.egui_ctx.set_theme(egui::ThemePreference::Light),
-            Ok("dark") => cc.egui_ctx.set_theme(egui::ThemePreference::Dark),
-            _ => {}
-        }
+        let (themes, theme_errors) = load_themes();
+        let requested = std::env::var("PATINA_THEME").unwrap_or_default();
+        let light_dark = match requested.as_str() {
+            "light" => egui::ThemePreference::Light,
+            "dark" => egui::ThemePreference::Dark,
+            _ => egui::ThemePreference::System,
+        };
+        let theme = themes.iter().position(|t| t.name == requested).unwrap_or(0);
         let root = std::env::var_os("PATINA_ROOT")
             .or_else(|| std::env::var_os("HOME"))
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/"));
         let label = root.file_name().map_or("/".into(), |n| n.to_string_lossy().into_owned());
-        Self {
+        let gallery = Self {
             custom_frame: true,
+            themes,
+            theme,
+            light_dark,
+            theme_errors,
             tree: FolderTree::new(root.clone(), label),
             current: root,
             text: "Some text".into(),
@@ -62,6 +78,65 @@ impl Gallery {
             checked: true,
             choice: 0,
             screenshot: std::env::var_os("PATINA_SCREENSHOT").map(|p| (PathBuf::from(p), false)),
+        };
+        gallery.apply_theme(&cc.egui_ctx);
+        gallery
+    }
+
+    fn apply_theme(&self, ctx: &egui::Context) {
+        let theme = &self.themes[self.theme];
+        theme.apply(ctx);
+        if theme.follows_desktop() {
+            ctx.set_theme(self.light_dark);
+        }
+    }
+
+    fn theme_menu(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        let mut changed = false;
+        for (i, theme) in self.themes.iter().enumerate() {
+            let resp = ui.radio_value(&mut self.theme, i, &theme.name);
+            let resp = match (&theme.path, &theme.author) {
+                (Some(path), _) => resp.on_hover_text(path.display().to_string()),
+                (None, Some(author)) => resp.on_hover_text(format!("Built in, by {author}")),
+                (None, None) => resp.on_hover_text("Stock egui"),
+            };
+            changed |= resp.clicked();
+        }
+        ui.separator();
+        ui.add_enabled_ui(self.themes[self.theme].follows_desktop(), |ui| {
+            for (value, label) in [
+                (egui::ThemePreference::System, "Follow desktop"),
+                (egui::ThemePreference::Light, "Light"),
+                (egui::ThemePreference::Dark, "Dark"),
+            ] {
+                changed |= ui.radio_value(&mut self.light_dark, value, label).clicked();
+            }
+        });
+        ui.separator();
+        if ui.button("Reload themes").clicked() {
+            let name = self.themes[self.theme].name.clone();
+            (self.themes, self.theme_errors) = load_themes();
+            self.theme = self.themes.iter().position(|t| t.name == name).unwrap_or(0);
+            changed = true;
+        }
+        if let Some(dir) = theme::shared_dir() {
+            let resp = ui.button("Copy built-in themes to folder").on_hover_text(dir.display().to_string());
+            if resp.clicked() {
+                match theme::export_built_ins(&dir, theme::BUILT_IN) {
+                    Ok(export) => eprintln!("copied {:?}, kept {:?} in {}", export.copied, export.skipped, dir.display()),
+                    Err(e) => self.theme_errors.push(e),
+                }
+            }
+        }
+        if !self.theme_errors.is_empty() {
+            ui.separator();
+            for error in &self.theme_errors {
+                ui.colored_label(ui.visuals().error_fg_color, error);
+            }
+        }
+        if changed {
+            self.apply_theme(&ctx);
         }
     }
 
@@ -75,18 +150,7 @@ impl Gallery {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(!self.custom_frame));
                     }
                 });
-                ui.menu_button("Theme", |ui| {
-                    let mut pref = ui.options(|o| o.theme_preference);
-                    for (value, label) in [
-                        (egui::ThemePreference::System, "Follow desktop"),
-                        (egui::ThemePreference::Light, "Light"),
-                        (egui::ThemePreference::Dark, "Dark"),
-                    ] {
-                        if ui.radio_value(&mut pref, value, label).clicked() {
-                            ctx.set_theme(pref);
-                        }
-                    }
-                });
+                ui.menu_button("Theme", |ui| self.theme_menu(ui));
             },
             |ui| {
                 let _ = ui.button("Right");
@@ -97,7 +161,7 @@ impl Gallery {
 
     fn widgets(&mut self, ui: &mut egui::Ui) {
         ui.heading("Widgets");
-        ui.label("Stock egui widgets in the active visuals; a skin restyles all of these.");
+        ui.label("Stock egui widgets in the active visuals; a theme restyles all of these.");
         ui.add_space(8.0);
         egui::Grid::new("widgets").num_columns(2).spacing([24.0, 10.0]).show(ui, |ui| {
             ui.label("Buttons");
@@ -167,11 +231,16 @@ impl Gallery {
     }
 }
 
+/// Patina's built-in themes and the suite's shared folder.
+fn load_themes() -> (Vec<Theme>, Vec<String>) {
+    theme::load_all(theme::BUILT_IN, &theme::shared_dir().into_iter().collect::<Vec<_>>())
+}
+
 impl eframe::App for Gallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.tree.poll();
-        let style = FrameStyle::from_visuals(ui.visuals());
+        let style = self.themes[self.theme].frame_style(ui.visuals());
         let radius = if self.custom_frame { frame::corner_radius(&ctx, style.radius) } else { 0 };
 
         egui::Panel::top("header")
