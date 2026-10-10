@@ -4,15 +4,15 @@
 //! how to use the frame (see the steps in `patina::frame`).
 //!
 //! With `PATINA_SCREENSHOT` set to a PNG path it saves a screenshot of its
-//! window there and quits (`make screenshot`). `PATINA_THEME` picks the
-//! theme: `light`, `dark` or a theme's name. `PATINA_ROOT` sets the folder
+//! window there and quits (`make screenshot`). `PATINA_SKIN` picks the
+//! skin: `light`, `dark` or a skin's name. `PATINA_ROOT` sets the folder
 //! tree's root (default: home).
 
 use std::path::PathBuf;
 
 use eframe::egui;
 use patina::frame::{self, FrameStyle, TitleBar};
-use patina::theme::{self, Theme};
+use patina::skin::{self, Skin};
 use patina::tree::FolderTree;
 
 fn main() -> eframe::Result {
@@ -32,13 +32,13 @@ fn main() -> eframe::Result {
 
 struct Gallery {
     custom_frame: bool,
-    themes: Vec<Theme>,
-    /// Index into `themes`.
-    theme: usize,
-    /// Light, dark or following the desktop, while the theme is Default.
+    skins: Vec<Skin>,
+    /// Index into `skins`.
+    skin: usize,
+    /// Light, dark or following the desktop, while the skin is Default.
     light_dark: egui::ThemePreference,
-    /// Problems loading themes, shown in the Theme menu.
-    theme_errors: Vec<String>,
+    /// Problems loading skins, shown in the Skin menu.
+    skin_errors: Vec<String>,
     tree: FolderTree,
     current: PathBuf,
     text: String,
@@ -52,14 +52,14 @@ struct Gallery {
 impl Gallery {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         patina::appearance::watch(&cc.egui_ctx);
-        let (themes, theme_errors) = load_themes();
-        let requested = std::env::var("PATINA_THEME").unwrap_or_default();
+        let (skins, skin_errors) = load_skins();
+        let requested = std::env::var("PATINA_SKIN").unwrap_or_default();
         let light_dark = match requested.as_str() {
             "light" => egui::ThemePreference::Light,
             "dark" => egui::ThemePreference::Dark,
             _ => egui::ThemePreference::System,
         };
-        let theme = themes.iter().position(|t| t.name == requested).unwrap_or(0);
+        let skin = skins.iter().position(|t| t.name == requested).unwrap_or(0);
         let root = std::env::var_os("PATINA_ROOT")
             .or_else(|| std::env::var_os("HOME"))
             .map(PathBuf::from)
@@ -67,10 +67,10 @@ impl Gallery {
         let label = root.file_name().map_or("/".into(), |n| n.to_string_lossy().into_owned());
         let gallery = Self {
             custom_frame: true,
-            themes,
-            theme,
+            skins,
+            skin,
             light_dark,
-            theme_errors,
+            skin_errors,
             tree: FolderTree::new(root.clone(), label),
             current: root,
             text: "Some text".into(),
@@ -79,24 +79,24 @@ impl Gallery {
             choice: 0,
             screenshot: std::env::var_os("PATINA_SCREENSHOT").map(|p| (PathBuf::from(p), false)),
         };
-        gallery.apply_theme(&cc.egui_ctx);
+        gallery.apply_skin(&cc.egui_ctx);
         gallery
     }
 
-    fn apply_theme(&self, ctx: &egui::Context) {
-        let theme = &self.themes[self.theme];
-        theme.apply(ctx);
-        if theme.follows_desktop() {
+    fn apply_skin(&self, ctx: &egui::Context) {
+        let skin = &self.skins[self.skin];
+        skin.apply(ctx);
+        if skin.follows_desktop() {
             ctx.set_theme(self.light_dark);
         }
     }
 
-    fn theme_menu(&mut self, ui: &mut egui::Ui) {
+    fn skin_menu(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         let mut changed = false;
-        for (i, theme) in self.themes.iter().enumerate() {
-            let resp = ui.radio_value(&mut self.theme, i, &theme.name);
-            let resp = match (&theme.path, &theme.author) {
+        for (i, skin) in self.skins.iter().enumerate() {
+            let resp = ui.radio_value(&mut self.skin, i, &skin.name);
+            let resp = match (&skin.path, &skin.author) {
                 (Some(path), _) => resp.on_hover_text(path.display().to_string()),
                 (None, Some(author)) => resp.on_hover_text(format!("Built in, by {author}")),
                 (None, None) => resp.on_hover_text("Stock egui"),
@@ -104,7 +104,7 @@ impl Gallery {
             changed |= resp.clicked();
         }
         ui.separator();
-        ui.add_enabled_ui(self.themes[self.theme].follows_desktop(), |ui| {
+        ui.add_enabled_ui(self.skins[self.skin].follows_desktop(), |ui| {
             for (value, label) in [
                 (egui::ThemePreference::System, "Follow desktop"),
                 (egui::ThemePreference::Light, "Light"),
@@ -114,29 +114,29 @@ impl Gallery {
             }
         });
         ui.separator();
-        if ui.button("Reload themes").clicked() {
-            let name = self.themes[self.theme].name.clone();
-            (self.themes, self.theme_errors) = load_themes();
-            self.theme = self.themes.iter().position(|t| t.name == name).unwrap_or(0);
+        if ui.button("Reload skins").clicked() {
+            let name = self.skins[self.skin].name.clone();
+            (self.skins, self.skin_errors) = load_skins();
+            self.skin = self.skins.iter().position(|t| t.name == name).unwrap_or(0);
             changed = true;
         }
-        if let Some(dir) = theme::shared_dir() {
-            let resp = ui.button("Copy built-in themes to folder").on_hover_text(dir.display().to_string());
+        if let Some(dir) = skin::shared_dir() {
+            let resp = ui.button("Copy built-in skins to folder").on_hover_text(dir.display().to_string());
             if resp.clicked() {
-                match theme::export_built_ins(&dir, theme::BUILT_IN) {
+                match skin::export_built_ins(&dir, skin::BUILT_IN) {
                     Ok(export) => eprintln!("copied {:?}, kept {:?} in {}", export.copied, export.skipped, dir.display()),
-                    Err(e) => self.theme_errors.push(e),
+                    Err(e) => self.skin_errors.push(e),
                 }
             }
         }
-        if !self.theme_errors.is_empty() {
+        if !self.skin_errors.is_empty() {
             ui.separator();
-            for error in &self.theme_errors {
+            for error in &self.skin_errors {
                 ui.colored_label(ui.visuals().error_fg_color, error);
             }
         }
         if changed {
-            self.apply_theme(&ctx);
+            self.apply_skin(&ctx);
         }
     }
 
@@ -150,7 +150,7 @@ impl Gallery {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(!self.custom_frame));
                     }
                 });
-                ui.menu_button("Theme", |ui| self.theme_menu(ui));
+                ui.menu_button("Skin", |ui| self.skin_menu(ui));
             },
             |ui| {
                 let _ = ui.button("Right");
@@ -161,7 +161,7 @@ impl Gallery {
 
     fn widgets(&mut self, ui: &mut egui::Ui) {
         ui.heading("Widgets");
-        ui.label("Stock egui widgets in the active visuals; a theme restyles all of these.");
+        ui.label("Stock egui widgets in the active visuals; a skin restyles all of these.");
         ui.add_space(8.0);
         egui::Grid::new("widgets").num_columns(2).spacing([24.0, 10.0]).show(ui, |ui| {
             ui.label("Buttons");
@@ -231,16 +231,16 @@ impl Gallery {
     }
 }
 
-/// Patina's built-in themes and the suite's shared folder.
-fn load_themes() -> (Vec<Theme>, Vec<String>) {
-    theme::load_all(theme::BUILT_IN, &theme::shared_dir().into_iter().collect::<Vec<_>>())
+/// Patina's built-in skins and the suite's shared folder.
+fn load_skins() -> (Vec<Skin>, Vec<String>) {
+    skin::load_all(skin::BUILT_IN, &skin::shared_dir().into_iter().collect::<Vec<_>>())
 }
 
 impl eframe::App for Gallery {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.tree.poll();
-        let style = self.themes[self.theme].frame_style(ui.visuals());
+        let style = self.skins[self.skin].frame_style(ui.visuals());
         let radius = if self.custom_frame { frame::corner_radius(&ctx, style.radius) } else { 0 };
 
         egui::Panel::top("header")

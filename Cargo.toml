@@ -5,7 +5,7 @@ edition = "2024"
 license = "BSD-3-Clause"
 description = "Patina: the window frame, components and design language shared by Photograph, UnAmp and other egui desktop apps"
 repository = "https://github.com/Sector-F-Labs/patina"
-keywords = ["egui", "gui", "components", "theme", "desktop"]
+keywords = ["egui", "gui", "components", "skin", "desktop"]
 categories = ["gui"]
 
 [lib]

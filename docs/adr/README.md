@@ -45,7 +45,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0001](0001-one-crate-for-the-suite.md) | Share the suite's frame and components as one published crate, Patina | Accepted |
 | [0002](0002-adrs-in-every-patina-app.md) | Recommend ADRs for every Patina app, and keep them for Patina itself | Accepted |
 | [0003](0003-frame-api.md) | The frame's API: a TitleBar builder with left and right slots, styled by FrameStyle | Proposed |
-| [0004](0004-themes-in-patina.md) | Move the suite theme format into Patina, with a shared themes folder and Dark Orange built in | Proposed |
+| [0004](0004-skins-in-patina.md) | Move the suite skin format into Patina, with a shared skins folder and Dark Orange built in | Proposed |
 
 ## Decision Relationship
 
@@ -53,7 +53,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 flowchart TD
     A[0001: One crate for the suite] --> B[0002: ADRs in every Patina app]
     A --> C[0003: Frame API]
-    A --> D[0004: Themes in Patina]
+    A --> D[0004: Skins in Patina]
     C --> D
 ```
 
@@ -63,6 +63,6 @@ flowchart TD
   [ADR-0003](0003-frame-api.md).
 - egui releases break the apps' shared upgrade, or one app needs to stay behind. See
   [ADR-0001](0001-one-crate-for-the-suite.md).
-- A shared theme key needs to differ between apps, or users want per-app overrides of a shared
-  theme. See [ADR-0004](0004-themes-in-patina.md).
+- A shared skin key needs to differ between apps, or users want per-app overrides of a shared
+  skin. See [ADR-0004](0004-skins-in-patina.md).
 - A component only one app uses keeps growing app-specific options. Move it back into the app.

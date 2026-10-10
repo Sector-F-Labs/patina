@@ -5,7 +5,7 @@ Patina is the shared window frame, components and design language of a family of
 and [UnAmp](https://github.com/divanvisagie/UnAmp) are the first.
 
 You can skin each app completely differently. What they share is how they behave: one window
-frame, one theme format and one set of rules. See [docs/design.md](docs/design.md).
+frame, one skin format and one set of rules. See [docs/design.md](docs/design.md).
 
 ![The Patina gallery](docs/gallery-dark.png)
 
@@ -38,8 +38,8 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`frame`**: the app's own window frame, with a header bar, GNOME-style window controls, resize
   edges and rounded corners. Moving and resizing go to the compositor.
 - **`appearance`**: follows the desktop's light/dark setting through the XDG portal.
-- **`theme`**: themes in the suite format, which every app reads, with app sections, a shared
-  user folder and the built-in Dark Orange. See [docs/themes.md](docs/themes.md).
+- **`skin`**: skins in the suite format, which every app reads, with app sections, a shared
+  user folder and the built-in Dark Orange. See [docs/skinning.md](docs/skinning.md).
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
 

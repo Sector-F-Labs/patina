@@ -58,7 +58,7 @@ pub struct WindowControlColors {
 impl FrameStyle {
     /// The frame drawn in the active egui visuals: panel colours for the
     /// bar, the widget colours for the window controls, and GNOME's red close
-    /// button. A theme overrides what it sets and starts from this.
+    /// button. A skin overrides what it sets and starts from this.
     pub fn from_visuals(v: &egui::Visuals) -> Self {
         Self {
             title_bar: v.panel_fill,

@@ -1,6 +1,6 @@
 # Dark Orange: Yaru-style dark greys with Ubuntu orange, the look
 # Photograph was built in (its `photograph_visuals`). Built into Patina, so
-# every Patina app offers it. See docs/themes.md for the format.
+# every Patina app offers it. See docs/skinning.md for the format.
 
 format = 1
 name = "Dark Orange"

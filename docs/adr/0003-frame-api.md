@@ -13,7 +13,7 @@ The two copies of the frame had different signatures:
 - **Photograph:** `title_bar(ui, title, custom, left, right)`, painted straight from egui's
   visuals.
 - **UnAmp:** `title_bar(ui, style, title, custom, menus)`. It has a `FrameStyle` resolved from
-  its theme, and wraps its controls in a `MenuBar`. It lays the row out in separate child areas,
+  its skin, and wraps its controls in a `MenuBar`. It lays the row out in separate child areas,
   because a menu bar takes its whole width and pushed the panel wider than the window.
 
 Each app also repeated the same setup around the bar:
@@ -39,7 +39,7 @@ Each app also repeated the same setup around the bar:
   the right slot.
 - **`FrameStyle`** holds every colour the frame paints, the window controls apart from the
   app's buttons. `FrameStyle::from_visuals` is the unskinned look, with the fallbacks from
-  UnAmp's theme code.
+  UnAmp's skin code.
   - This means unskinned Photograph's window-button icons take the widget foreground colours
     rather than the text colours. The difference is slight.
 - **Helpers for the setup:** `viewport`, `header_frame` (12×8 px padding, top corners rounded),
@@ -52,7 +52,7 @@ Each app also repeated the same setup around the bar:
 - Apps can't easily drift from the header-bar padding and corners, because the helpers set them.
 - A builder can grow options, such as hiding maximise for a fixed-size window, without breaking
   callers.
-- `FrameStyle` will be filled by the theme loader once that moves here. Until then each app
+- `FrameStyle` will be filled by the skin loader once that moves here. Until then each app
   builds its own, and Photograph uses `from_visuals`.
 - Both apps change their call sites when they switch.
 - Apps still own their panels' bottom-corner rounding, which depends on their layout. A

@@ -15,12 +15,12 @@ look to each app and its skins.
 1. **Stock egui first.** With no skin chosen, an app uses egui's default `Style`, `Visuals` and
    fonts, following the desktop's light/dark setting. Only paint your own widget when egui has
    none, and then take its colours from the active `Visuals`.
-2. **Skinnable all the way down.** Every colour an app paints must be reachable from its theme,
-   including the window frame. A theme a user writes must never crash the app. Bad values are
+2. **Skinnable all the way down.** Every colour an app paints must be reachable from its skin,
+   including the window frame. A skin a user writes must never crash the app. Bad values are
    reported, and unknown keys are ignored with a warning.
-3. **Diversity within rules.** Apps share the frame, how it behaves, the theme format's shared
+3. **Diversity within rules.** Apps share the frame, how it behaves, the skin format's shared
    sections and the rules on this page. Anything particular to one app goes under that app's own
-   theme section and code.
+   skin section and code.
 4. **Feel native to the desktop.** Moving, resizing, snapping and tiling are left to the
    compositor. Window controls and corners follow GNOME/libadwaita, and the light/dark setting
    follows the XDG portal. A system title bar is always available as a setting, in case the
@@ -44,7 +44,7 @@ Implemented by `patina::frame`.
 - **Window buttons:** minimise, maximise/restore and close, 30×22 px, 4 px apart, kept 8 px from
   the right-hand controls.
   - They're quiet until hovered. Close turns GNOME red (`#c01c28`) with a white icon on hover.
-  - Their colours are themed apart from the app's buttons.
+  - Their colours are skinned apart from the app's buttons.
 - **On the bar's empty space:** drag to move, double-click to maximise or restore, right-click
   for a window menu.
 - **Edges:** a one-pixel border in the window stroke colour, and invisible resize handles 5 px
@@ -54,11 +54,11 @@ Implemented by `patina::frame`.
   - The header bar holds both top corners. The bottom corners belong to whichever panels sit
     there, e.g. a sidebar on the left and the central panel on the right.
 
-## Themes
+## Skins
 
-Implemented by `patina::theme`. The format is documented in [themes.md](themes.md).
+Implemented by `patina::skin`. The format is documented in [skinning.md](skinning.md).
 
-- **Same files in every app:** themes use the suite format, with a `format` version, shared
+- **Same files in every app:** skins use the suite format, with a `format` version, shared
   `[colors]`, `[controls]` and `[window]` sections, and one `[app.<name>]` section per app.
   - Keys are named for a role (`surface`, `pressed`, `title_bar`), not for a widget or an app
     feature.
@@ -66,8 +66,8 @@ Implemented by `patina::theme`. The format is documented in [themes.md](themes.m
   - **Default:** stock egui, following the desktop.
   - **Patina's built-ins:** Dark Orange, Photograph's look.
   - **The app's own built-ins.**
-  - **The user's themes:** in `~/.config/patina/themes/`, shared by every app.
-- **Within the rules:** a theme dropped into any app brings its shared look with it. The app's
+  - **The user's skins:** in `~/.config/patina/skins/`, shared by every app.
+- **Within the rules:** a skin dropped into any app brings its shared look with it. The app's
   own section waits until that app reads the file. This is how an app can look completely
   different from its siblings while sharing everything else.
 
@@ -77,7 +77,7 @@ Implemented by `patina::theme`. The format is documented in [themes.md](themes.m
 |--------|------|------|
 | `frame` | Own window frame: header bar, window buttons, edges, compositor hand-off | UnAmp, Photograph |
 | `appearance` | Follow the desktop's light/dark setting (XDG portal) | UnAmp, Photograph |
-| `theme` | Suite theme format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
+| `skin` | Suite skin format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
 | `tree` | Lazily loaded sidebar folder tree | UnAmp |
 
 Run `make gallery` to see each one. A component belongs in Patina when a second app wants it.

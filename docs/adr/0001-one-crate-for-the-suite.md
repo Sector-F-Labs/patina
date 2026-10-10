@@ -18,13 +18,13 @@ Photograph and UnAmp were built in the same style, and code started moving betwe
 - **Plain copies:** `appearance.rs` (desktop light/dark) differed by 4 lines and `locations.rs`
   by 22. UnAmp's ADR-0005 chose copying for now, with "a third app, or the copies diverge" as
   the trigger to extract a crate.
-- **Shared themes were already planned.** UnAmp's theme format (its ADR-0024) has sections shared
+- **Shared skins were already planned.** UnAmp's skin format (its ADR-0024) has sections shared
   across apps and was designed for a suite.
 - **Photograph wants more:** UnAmp's lazy folder tree, and eventually skins.
 
 We considered:
 
-- **Only the window frame and theme.** It doesn't cover the tree, or other components later.
+- **Only the window frame and skin.** It doesn't cover the tree, or other components later.
 - **A general egui widget library.** That would be scope without a second user.
 - **One crate for the family**, holding components a second app wants plus the design
   language's documentation. This won. The user named the family style **Patina**: rust made
@@ -40,7 +40,7 @@ We will build Patina as one library crate in `com/sectorflabs/patina`.
 - **What goes in:** a component goes in when a second app wants it, and it uses only std, egui
   and small helper crates (zbus for the portal), never an app's own types. It starts with
   `frame`, `appearance` and `tree`, each moved from UnAmp, the more developed copy.
-  - **Later steps:** the theme loader ([ADR-0004](0004-themes-in-patina.md)), and maybe mount discovery behind a
+  - **Later steps:** the skin loader ([ADR-0004](0004-skins-in-patina.md)), and maybe mount discovery behind a
     feature.
 - **What stays out:** app-specific parts such as UnAmp's classic `.wsz` renderer, playlist
   reordering and window tiling.
