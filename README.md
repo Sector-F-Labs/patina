@@ -44,8 +44,10 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 ## Develop
 
 ```sh
+make              # list targets
 make gallery      # every component on one screen
-make test         # tests and clippy
+make test         # tests
+make check        # tests and clippy
 make screenshot   # docs/gallery-{light,dark}.png
 ```
 
