@@ -35,11 +35,24 @@ Implemented by `patina::frame`.
 
 - **The app draws its own frame.** The window opens undecorated and transparent, and the top
   panel is a header bar.
-- **Header bar layout:** the app's controls on the left, the title in the centre, and more
-  controls on the right next to the window buttons.
+- **Header bar layout:** a menu bar on the left, the title in the centre, and the app's output
+  actions on the right, next to the window buttons
+  ([ADR-0006](adr/0006-title-bar-menus-left-output-actions-right.md)).
+  - **Left: a standard menu bar,** in words: File, Edit, View, then the app's own menus, then
+    Skins. Not a GNOME-style hamburger. Actions that make a new item (New Note, New Folder) go in
+    the app's sidebar or tree as well as in File.
+  - **Right: the actions that serve the app's goal,** its main output. Examples:
+    - Photograph: Render, and Edit for the selected photo.
+    - Notebook: the Markdown source switch and the formatting buttons.
+    - Calendar: Today and the Day/Week/Month switch.
+
+    A consumption app with no output, like UnAmp, a music player, leaves the right side empty.
+  - **Elsewhere:** settings, status and secondary information go in the menus, a sidebar or a
+    status bar, not the title bar. Photograph's GPU status sits in a status bar at the bottom.
   - The title is centred on the window, not on the gap between the controls, and gets an
     ellipsis when there's no room.
-  - Left controls are either buttons (Photograph's toolbar) or a menu bar (UnAmp's menus).
+  - When a skin colours the bar, the bar's own menus and buttons are drawn in its title colour.
+    Their menus open in the skin's normal colours.
   - The bar's padding is 12 px horizontal and 8 px vertical. The row is 25 px high.
 - **Window buttons:** minimise, maximise/restore and close, 30×22 px, 4 px apart, kept 8 px from
   the right-hand controls.
@@ -52,7 +65,8 @@ Implemented by `patina::frame`.
 - **Corners:** libadwaita's 15 px window radius, square while maximised or full screen.
   - The clear colour is transparent, so the panel holding each corner carries the rounding.
   - The header bar holds both top corners. The bottom corners belong to whichever panels sit
-    there, e.g. a sidebar on the left and the central panel on the right.
+    there, e.g. a sidebar on the left and the central panel on the right, or a status bar
+    across the bottom holding both.
 
 ## Skins
 

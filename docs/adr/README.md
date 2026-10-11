@@ -47,6 +47,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0003](0003-frame-api.md) | The frame's API: a TitleBar builder with left and right slots, styled by FrameStyle | Proposed |
 | [0004](0004-skins-in-patina.md) | Move the suite skin format into Patina, with a shared skins folder and Dark Orange built in | Proposed |
 | [0005](0005-app-skins-built-into-patina.md) | Build Calendar, Notebook and Steam Classic into Patina, and colour controls on a coloured bar | Accepted |
+| [0006](0006-title-bar-menus-left-output-actions-right.md) | Title bar: word menus on the left, the app's output actions on the right | Accepted |
 
 ## Decision Relationship
 
@@ -57,6 +58,7 @@ flowchart TD
     A --> D[0004: Skins in Patina]
     C --> D
     D --> E[0005: App skins built in, bar controls]
+    C --> F[0006: Menus left, output actions right]
     C --> E
 ```
 
