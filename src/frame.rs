@@ -202,12 +202,14 @@ impl<'a> TitleBar<'a> {
             buttons_left = buttons.min_rect().left() - CONTROLS_GAP;
         }
         let mut right_ui = child(ui, row.with_max_x(buttons_left), egui::Layout::right_to_left(egui::Align::Center));
+        bar_controls(&mut right_ui, style);
         steady_controls(&mut right_ui);
         right(&mut right_ui);
         let right_width = (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
         let mut left_ui = child(ui, left_rect, egui::Layout::left_to_right(egui::Align::Center));
+        bar_controls(&mut left_ui, style);
         steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
         let measured = |ui: &mut egui::Ui| {
@@ -226,7 +228,7 @@ impl<'a> TitleBar<'a> {
         // shortened with an ellipsis rather than running into either side.
         let room = bar.width() - 2.0 * left_width.max(right_width) - 16.0;
         if custom && room > 40.0 {
-            let galley = egui::WidgetText::from(egui::RichText::new(title).strong()).into_galley(
+            let galley = egui::WidgetText::from(egui::RichText::new(title).strong().color(style.title_text)).into_galley(
                 ui,
                 Some(egui::TextWrapMode::Truncate),
                 room,
@@ -236,6 +238,34 @@ impl<'a> TitleBar<'a> {
             ui.painter().galley(pos, galley, style.title_text);
         }
     }
+}
+
+/// Colours the bar's controls from the frame style when a skin gives the bar
+/// a colour of its own (Calendar's red, Notebook's brown), so menus and
+/// buttons read on it: text in `title_text`, fills from the window controls'
+/// hover and pressed colours, and a wash of the title text at rest. Popups
+/// build their own UI, so menus keep the skin's normal colours. A bar in the
+/// panel colour, as in Default and Dark Orange, is left alone.
+fn bar_controls(ui: &mut egui::Ui, style: &FrameStyle) {
+    let v = ui.visuals_mut();
+    if style.title_bar == v.panel_fill {
+        return;
+    }
+    let ink = style.title_text;
+    v.override_text_color = Some(ink);
+    v.weak_text_color = Some(ink.gamma_multiply(0.75));
+    v.widgets.noninteractive.bg_stroke.color = ink.gamma_multiply(0.35);
+    for (w, fill) in [
+        (&mut v.widgets.inactive, ink.gamma_multiply(0.14)),
+        (&mut v.widgets.hovered, style.controls.hover),
+        (&mut v.widgets.active, style.controls.pressed),
+        (&mut v.widgets.open, style.controls.pressed),
+    ] {
+        w.weak_bg_fill = fill;
+        w.fg_stroke.color = ink;
+    }
+    v.selection.bg_fill = ink.gamma_multiply(0.26);
+    v.selection.stroke.color = ink;
 }
 
 /// Takes the strokes off the bar's controls. egui draws an idle toggle
@@ -552,5 +582,20 @@ mod hover_tests {
             let hovered = rects(&ctx, t + 0.1, vec![]);
             assert_eq!(hovered, rest, "hovering control {i} moved the others");
         }
+    }
+
+    #[test]
+    fn bar_controls_only_change_a_coloured_bar() {
+        let ctx = egui::Context::default();
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let plain = FrameStyle::from_visuals(ui.visuals());
+            let before = ui.visuals().clone();
+            bar_controls(ui, &plain);
+            assert_eq!(*ui.visuals(), before, "a bar in the panel colour is left alone");
+            let red = FrameStyle { title_bar: Color32::RED, title_text: Color32::WHITE, ..plain };
+            bar_controls(ui, &red);
+            assert_eq!(ui.visuals().widgets.inactive.fg_stroke.color, Color32::WHITE);
+            assert_eq!(ui.visuals().override_text_color, Some(Color32::WHITE));
+        });
     }
 }

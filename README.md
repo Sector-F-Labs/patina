@@ -39,7 +39,7 @@ Patina re-exports `egui`, and an app has to use the same egui version.
   edges and rounded corners. Moving and resizing go to the compositor.
 - **`appearance`**: follows the desktop's light/dark setting through the XDG portal.
 - **`skin`**: skins in the suite format, which every app reads, with app sections, a shared
-  user folder and the built-in Dark Orange. See [docs/skinning.md](docs/skinning.md).
+  user folder and the built-ins Dark Orange, Calendar, Notebook and Steam Classic. See [docs/skinning.md](docs/skinning.md).
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
 

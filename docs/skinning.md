@@ -19,7 +19,10 @@ The format began as UnAmp's skins (UnAmp ADR-0024) and moved here in
 |---|---|---|
 | **Default** | Built in, no file | Stock egui, following the desktop's light/dark setting |
 | **Dark Orange** | Patina's [`skins/dark-orange.toml`](../skins/dark-orange.toml), in every app | Yaru-style dark greys and Ubuntu orange, the look Photograph was built in |
-| An app's built-ins | Compiled into that app | e.g. UnAmp's Steam Classic |
+| **Calendar** | Patina's [`skins/calendar.toml`](../skins/calendar.toml), in every app | A deep red title bar (freebsd.org's red) over warm off-white paper; Calendar starts in it |
+| **Notebook** | Patina's [`skins/notebook.toml`](../skins/notebook.toml), in every app | A leather-brown title bar over cream paper; Notebook starts in it |
+| **Steam Classic** | Patina's [`skins/steam-classic.toml`](../skins/steam-classic.toml), in every app | The olive-green VGUI look of the 2003–2008 Steam client, square corners; its comments document the format |
+| An app's built-ins | Compiled into that app | Anything only that app should offer |
 | Yours | `~/.config/patina/skins/*.toml`, read by every Patina app, plus any folder of the app's own | Anything |
 
 A skin with the same `name` as one listed before it **replaces** it. That's how you customise a
@@ -101,6 +104,10 @@ Every Patina app draws its own title bar and window edge (`patina::frame`).
 | `title_text` | The window title (defaults to `colors.text`) |
 | `border` | The one-pixel window edge (defaults to `colors.border`) |
 | `corner_radius` | The window's corners, in px. Defaults to the top-level `corner_radius`, else GNOME's 15. Square while maximised. |
+
+When `title_bar` differs from `colors.background`, the bar's own menus and buttons are drawn in
+`title_text`, with `[window.controls]` hover and pressed fills, so they read on the bar's colour
+(as in Calendar and Notebook). Their menus open in the skin's normal colours.
 
 ### `[window.controls]`: minimise, maximise, close
 

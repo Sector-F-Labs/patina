@@ -46,6 +46,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0002](0002-adrs-in-every-patina-app.md) | Recommend ADRs for every Patina app, and keep them for Patina itself | Accepted |
 | [0003](0003-frame-api.md) | The frame's API: a TitleBar builder with left and right slots, styled by FrameStyle | Proposed |
 | [0004](0004-skins-in-patina.md) | Move the suite skin format into Patina, with a shared skins folder and Dark Orange built in | Proposed |
+| [0005](0005-app-skins-built-into-patina.md) | Build Calendar, Notebook and Steam Classic into Patina, and colour controls on a coloured bar | Accepted |
 
 ## Decision Relationship
 
@@ -55,6 +56,8 @@ flowchart TD
     A --> C[0003: Frame API]
     A --> D[0004: Skins in Patina]
     C --> D
+    D --> E[0005: App skins built in, bar controls]
+    C --> E
 ```
 
 ## Revisit Triggers

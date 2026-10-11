@@ -64,7 +64,7 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
     feature.
 - **Where they come from:**
   - **Default:** stock egui, following the desktop.
-  - **Patina's built-ins:** Dark Orange, Photograph's look.
+  - **Patina's built-ins:** Dark Orange (Photograph's look), Calendar, Notebook and Steam Classic.
   - **The app's own built-ins.**
   - **The user's skins:** in `~/.config/patina/skins/`, shared by every app.
 - **Within the rules:** a skin dropped into any app brings its shared look with it. The app's

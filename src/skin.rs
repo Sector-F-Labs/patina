@@ -25,7 +25,12 @@ pub const DEFAULT_SKIN: &str = "Default";
 pub const FORMAT: u32 = 1;
 
 /// Skins built into Patina, as (file name, contents), offered by every app.
-pub const BUILT_IN: &[(&str, &str)] = &[("dark-orange.toml", include_str!("../skins/dark-orange.toml"))];
+pub const BUILT_IN: &[(&str, &str)] = &[
+    ("dark-orange.toml", include_str!("../skins/dark-orange.toml")),
+    ("calendar.toml", include_str!("../skins/calendar.toml")),
+    ("notebook.toml", include_str!("../skins/notebook.toml")),
+    ("steam-classic.toml", include_str!("../skins/steam-classic.toml")),
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -458,17 +463,30 @@ mod tests {
     }
 
     #[test]
+    fn built_ins_parse_cleanly_with_distinct_names() {
+        let mut names = Vec::new();
+        for (file, text) in BUILT_IN {
+            let skin = Skin::parse(text).unwrap_or_else(|e| panic!("{file}: {e}"));
+            assert!(skin.warnings.is_empty(), "{file}: {:?}", skin.warnings);
+            assert!(!names.contains(&skin.name), "{file}: {} twice", skin.name);
+            names.push(skin.name);
+        }
+        assert_eq!(names, ["Dark Orange", "Calendar", "Notebook", "Steam Classic"]);
+    }
+
+    #[test]
     fn export_copies_built_ins_once_and_keeps_edits() {
         let dir = temp_dir("export");
         let first = export_built_ins(&dir, BUILT_IN).unwrap();
-        assert_eq!(first.copied, vec!["dark-orange.toml"]);
+        let files: Vec<&str> = BUILT_IN.iter().map(|(f, _)| *f).collect();
+        assert_eq!(first.copied, files);
         let path = dir.join("dark-orange.toml");
         assert_eq!(std::fs::read_to_string(&path).unwrap(), BUILT_IN[0].1);
 
         std::fs::write(&path, "edited").unwrap();
         let second = export_built_ins(&dir, BUILT_IN).unwrap();
         assert!(second.copied.is_empty());
-        assert_eq!(second.skipped, vec!["dark-orange.toml"]);
+        assert_eq!(second.skipped, files);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "edited");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -482,9 +500,10 @@ mod tests {
         std::fs::write(dir.join("notes.txt"), "not a skin").unwrap();
         let (skins, errors) = load_all(BUILT_IN, std::slice::from_ref(&dir));
         let names: Vec<&str> = skins.iter().map(|t| t.name.as_str()).collect();
-        assert_eq!(names, ["Default", "Dark Orange"]);
-        assert_eq!(skins[1].base, Some(Base::Light));
-        assert!(skins[1].path.is_some());
+        assert_eq!(names, ["Default", "Calendar", "Dark Orange", "Notebook", "Steam Classic"]);
+        let mine = &skins[2];
+        assert_eq!(mine.base, Some(Base::Light));
+        assert!(mine.path.is_some());
         assert_eq!(errors.len(), 1, "{errors:?}");
         assert!(errors[0].starts_with("broken.toml"), "{errors:?}");
         let _ = std::fs::remove_dir_all(&dir);
