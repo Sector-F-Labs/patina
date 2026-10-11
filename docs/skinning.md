@@ -37,6 +37,11 @@ Problems are shown in the app's skin menu:
 
 ## Writing a skin
 
+A skin varies the look, never the layout or behaviour: that's what keeps Patina apps recognisable
+however they're skinned (see *Unity in variety* in [design.md](design.md)). Within a skin, vary
+one thing boldly and keep the rest calm: unusual shapes with a narrow palette, or a bold palette
+on the stock shapes.
+
 Every key except `format` and `name` is optional. **Any colour you leave out keeps egui's
 default** for the `base` skin, so a skin can be as small as this:
 
@@ -103,7 +108,7 @@ Every Patina app draws its own title bar and window edge (`patina::frame`).
 | `title_bar` | The title bar's background (defaults to `colors.background`) |
 | `title_text` | The window title (defaults to `colors.text`) |
 | `border` | The one-pixel window edge (defaults to `colors.border`) |
-| `corner_radius` | The window's corners, in px. Defaults to the top-level `corner_radius`, else GNOME's 15. Square while maximised. |
+| `corner_radius` | The window's corners, in px. Defaults to the top-level `corner_radius`, else 15. Square while maximised. |
 
 When `title_bar` differs from `colors.background`, the bar's own menus and buttons are drawn in
 `title_text`, with `[window.controls]` hover and pressed fills, so they read on the bar's colour
@@ -120,7 +125,7 @@ and not like the app's buttons. Each falls back to the matching control colour.
 | `icon_hover` | The symbols under the mouse |
 | `hover` | Background under the mouse |
 | `pressed` | Background while pressed |
-| `close_hover` | Close's background under the mouse (default GNOME red) |
+| `close_hover` | Close's background under the mouse (default red, `#c01c28`) |
 | `close_icon_hover` | Close's symbol under the mouse (default white) |
 
 ### `[app.<name>]`: an app's own parts

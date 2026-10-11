@@ -6,7 +6,9 @@ looks nothing like its siblings, yet they all keep the same rules. Patina is tho
 shared code that makes them easy to follow.
 
 KDE and GNOME make their apps look alike. Patina only makes them behave alike, and leaves the
-look to each app and its skins.
+look to each app and its skins. It doesn't follow GNOME or any other desktop's look: a few
+defaults (the 15 px window radius, the close button's red) were borrowed from GNOME as starting
+points, and that's all.
 
 ![The gallery in light and dark](gallery-light.png)
 
@@ -18,13 +20,27 @@ look to each app and its skins.
 2. **Skinnable all the way down.** Every colour an app paints must be reachable from its skin,
    including the window frame. A skin a user writes must never crash the app. Bad values are
    reported, and unknown keys are ignored with a warning.
-3. **Diversity within rules.** Apps share the frame, how it behaves, the skin format's shared
-   sections and the rules on this page. Anything particular to one app goes under that app's own
-   skin section and code.
+3. **Unity in variety.** Beautiful towns hold some things constant and let others vary. A
+   terrace of identical houses painted in different colours is lovely, and so is a street of
+   differently shaped buildings in one stone. When everything is the same the street is dull,
+   and when everything differs at once it's noise. The School of Life's
+   [How to Make an Attractive City](https://www.youtube.com/watch?v=Hy4QjmKzF1c) makes the case
+   for order and variety in balance. Thomas Sharp made the same point earlier as "unity in variety"
+   ([*Town and Townscape*](https://researcharchive.ncl.ac.uk/sharp/galrev/tandt.html), 1968).
+   Patina works the same way ([ADR-0007](adr/0007-unity-in-variety.md)):
+   - **Constant:** the structure. That means the frame's layout, where things go, how they
+     behave, and the skin format's shared sections.
+   - **Varied:** the skin, meaning colour, rounding, shadows and each app's own section.
+   - A skin may restyle anything, but never moves things or changes how they behave.
+   - An app adds its own parts under its own skin section and code. It keeps the shared frame
+     and menus where every Patina app has them.
+   - Within one skin, don't vary everything at once. A skin that changes shapes, such as Steam
+     Classic's square corners, holds to a narrow palette. A skin with a bold palette keeps the
+     shapes calm.
 4. **Feel native to the desktop.** Moving, resizing, snapping and tiling are left to the
-   compositor. Window controls and corners follow GNOME/libadwaita, and the light/dark setting
-   follows the XDG portal. A system title bar is always available as a setting, in case the
-   app's own frame misbehaves on someone's desktop.
+   compositor, and the light/dark setting follows the XDG portal. Native means behaving well on
+   the desktop, not copying its look. A system title bar is always available as a setting, in
+   case the app's own frame misbehaves on someone's desktop.
 5. **Never block the UI.** File and network I/O happen off the UI thread. A hung network share
    can slow a view down but must never freeze the window (see `tree`).
 6. **Record decisions.** Every Patina app keeps ADRs ([ADR-0002](adr/0002-adrs-in-every-patina-app.md)).
@@ -39,7 +55,7 @@ Implemented by `patina::frame`.
   actions on the right, next to the window buttons
   ([ADR-0006](adr/0006-title-bar-menus-left-output-actions-right.md)).
   - **Left: a standard menu bar,** in words: File, Edit, View, then the app's own menus, then
-    Skins. Not a GNOME-style hamburger. Actions that make a new item (New Note, New Folder) go in
+    Skins. Not a hamburger menu. Actions that make a new item (New Note, New Folder) go in
     the app's sidebar or tree as well as in File.
   - **Right: the actions that serve the app's goal,** its main output. Examples:
     - Photograph: Render, and Edit for the selected photo.
@@ -56,13 +72,15 @@ Implemented by `patina::frame`.
   - The bar's padding is 12 px horizontal and 8 px vertical. The row is 25 px high.
 - **Window buttons:** minimise, maximise/restore and close, 30×22 px, 4 px apart, kept 8 px from
   the right-hand controls.
-  - They're quiet until hovered. Close turns GNOME red (`#c01c28`) with a white icon on hover.
+  - They're quiet until hovered. Close turns red (`#c01c28`, GNOME's, as a default) with a white
+    icon on hover.
   - Their colours are skinned apart from the app's buttons.
 - **On the bar's empty space:** drag to move, double-click to maximise or restore, right-click
   for a window menu.
 - **Edges:** a one-pixel border in the window stroke colour, and invisible resize handles 5 px
   deep (12 px at the corners), drawn above everything else.
-- **Corners:** libadwaita's 15 px window radius, square while maximised or full screen.
+- **Corners:** a 15 px window radius by default (borrowed from GNOME; skins change it), square
+  while maximised or full screen.
   - The clear colour is transparent, so the panel holding each corner carries the rounding.
   - The header bar holds both top corners. The bottom corners belong to whichever panels sit
     there, e.g. a sidebar on the left and the central panel on the right, or a status bar
@@ -83,7 +101,8 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
   - **The user's skins:** in `~/.config/patina/skins/`, shared by every app.
 - **Within the rules:** a skin dropped into any app brings its shared look with it. The app's
   own section waits until that app reads the file. This is how an app can look completely
-  different from its siblings while sharing everything else.
+  different from its siblings while sharing everything else: unity in the structure, variety in
+  the skin (principle 3).
 
 ## Components
 

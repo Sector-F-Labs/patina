@@ -113,7 +113,7 @@ pub struct WindowSkin {
     pub title_bar: Option<Hex>,
     pub title_text: Option<Hex>,
     pub border: Option<Hex>,
-    /// Corner rounding of the whole window; GNOME's when unset.
+    /// Corner rounding of the whole window; 15 px (borrowed from GNOME) when unset.
     pub corner_radius: Option<u8>,
     /// Minimise, maximise and close: skinned apart from `[controls]`.
     #[serde(default)]
