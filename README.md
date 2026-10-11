@@ -43,6 +43,8 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
 
+Known problems and what's understood about them are in [docs/known-issues.md](docs/known-issues.md).
+
 ## Develop
 
 ```sh
