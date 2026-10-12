@@ -43,8 +43,12 @@ Patina re-exports `egui`, and an app has to use the same egui version.
   user folder and the built-ins Dark Orange, Calendar, Notebook and Steam Classic. See [docs/skinning.md](docs/skinning.md).
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
+- **`ime`**: `drop_repeated_preedits`, for `App::raw_input_hook`. Without it, a focused text field
+  on GNOME's Wayland keeps the window repainting at full speed.
 
 Known problems and what's understood about them are in [docs/known-issues.md](docs/known-issues.md).
+Traps any egui app can fall into, such as burning a core while idle, are in
+[docs/egui-pitfalls.md](docs/egui-pitfalls.md).
 
 ## Develop
 
