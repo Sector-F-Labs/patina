@@ -2311,6 +2311,7 @@ dependencies = [
  "eframe",
  "egui",
  "image",
+ "libc",
  "serde",
  "serde_ignored",
  "toml",

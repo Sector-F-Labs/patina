@@ -49,6 +49,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0005](0005-app-skins-built-into-patina.md) | Build Calendar, Notebook and Steam Classic into Patina, and colour controls on a coloured bar | Accepted |
 | [0006](0006-title-bar-menus-left-output-actions-right.md) | Title bar: word menus on the left, the app's output actions on the right | Accepted |
 | [0007](0007-unity-in-variety.md) | Unity in variety: the structure is shared, the skin varies, and GNOME is only a source of defaults | Accepted |
+| [0008](0008-window-buttons-follow-the-compositor.md) | Show only the window buttons the compositor supports, found by compositor name for now | Accepted |
 
 ## Decision Relationship
 
@@ -63,6 +64,7 @@ flowchart TD
     C --> E
     D --> G[0007: Unity in variety]
     C --> G
+    C --> H[0008: Window buttons follow the compositor]
 ```
 
 ## Revisit Triggers
@@ -73,4 +75,6 @@ flowchart TD
   [ADR-0001](0001-one-crate-for-the-suite.md).
 - A shared skin key needs to differ between apps, or users want per-app overrides of a shared
   skin. See [ADR-0004](0004-skins-in-patina.md).
+- winit exposes Wayland's `wm_capabilities`, or a compositor in the window-button table changes
+  what it supports. See [ADR-0008](0008-window-buttons-follow-the-compositor.md).
 - A component only one app uses keeps growing app-specific options. Move it back into the app.

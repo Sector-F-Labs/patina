@@ -92,6 +92,59 @@ pub fn clear_color(visuals: &egui::Visuals, custom: bool) -> [f32; 4] {
     if custom { [0.0; 4] } else { visuals.panel_fill.to_normalized_gamma_f32() }
 }
 
+/// Compositors that can't minimise or maximise a window, by process name.
+/// They ignore the requests, so the buttons would do nothing.
+const WITHOUT_MIN_MAX: &[&str] = &["dwl"];
+
+/// Whether the desktop can minimise and maximise windows. The header bar
+/// leaves those buttons out where it can't; apps can ask too, for their own
+/// shortcuts or menus.
+///
+/// Wayland tells each window this (`wm_capabilities`), but winit 0.30 drops
+/// it, so for now this goes by which compositor it is, found as fastfetch
+/// does: the process at the other end of the Wayland socket, looked up in a
+/// table. Anything unknown is assumed able to.
+pub fn can_minimise_and_maximise() -> bool {
+    static CAN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CAN.get_or_init(|| !compositor().is_some_and(|name| WITHOUT_MIN_MAX.contains(&name.as_str())))
+}
+
+/// The Wayland compositor's process name, if there is one and it can be seen
+/// (not from inside a sandbox with its own process IDs, say).
+#[cfg(target_os = "linux")]
+fn compositor() -> Option<String> {
+    use std::os::fd::AsRawFd;
+    let display = std::path::PathBuf::from(std::env::var_os("WAYLAND_DISPLAY")?);
+    let socket = if display.is_absolute() {
+        display
+    } else {
+        std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR")?).join(display)
+    };
+    let stream = std::os::unix::net::UnixStream::connect(socket).ok()?;
+    let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
+    let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: `cred` and `len` describe a writable `ucred`, as SO_PEERCRED expects.
+    let ok = unsafe {
+        libc::getsockopt(
+            stream.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            (&raw mut cred).cast(),
+            &mut len,
+        )
+    } == 0;
+    if !ok || cred.pid <= 0 {
+        return None;
+    }
+    let comm = std::fs::read_to_string(format!("/proc/{}/comm", cred.pid)).ok()?;
+    Some(comm.trim_end().to_owned())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn compositor() -> Option<String> {
+    None
+}
+
 fn maximized(ctx: &egui::Context) -> bool {
     ctx.input(|i| {
         let v = i.viewport();
@@ -168,7 +221,7 @@ impl<'a> TitleBar<'a> {
             if resp.drag_started_by(egui::PointerButton::Primary) {
                 hand_to_compositor(&ctx, ViewportCommand::StartDrag);
             }
-            if resp.double_clicked() {
+            if resp.double_clicked() && can_minimise_and_maximise() {
                 ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized(&ctx)));
             }
             resp.context_menu(|ui| window_menu(ui, &ctx));
@@ -191,13 +244,15 @@ impl<'a> TitleBar<'a> {
             if button(&mut buttons, &style.controls, Button::Close).on_hover_text("Close").clicked() {
                 ctx.send_viewport_cmd(ViewportCommand::Close);
             }
-            let max = maximized(&ctx);
-            let (kind, tip) = if max { (Button::Restore, "Restore") } else { (Button::Maximize, "Maximise") };
-            if button(&mut buttons, &style.controls, kind).on_hover_text(tip).clicked() {
-                ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
-            }
-            if button(&mut buttons, &style.controls, Button::Minimize).on_hover_text("Minimise").clicked() {
-                ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+            if can_minimise_and_maximise() {
+                let max = maximized(&ctx);
+                let (kind, tip) = if max { (Button::Restore, "Restore") } else { (Button::Maximize, "Maximise") };
+                if button(&mut buttons, &style.controls, kind).on_hover_text(tip).clicked() {
+                    ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
+                }
+                if button(&mut buttons, &style.controls, Button::Minimize).on_hover_text("Minimise").clicked() {
+                    ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+                }
             }
             buttons_left = buttons.min_rect().left() - CONTROLS_GAP;
         }
@@ -289,14 +344,16 @@ enum Button {
 }
 
 fn window_menu(ui: &mut egui::Ui, ctx: &egui::Context) {
-    if ui.button("Minimise").clicked() {
-        ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+    if can_minimise_and_maximise() {
+        if ui.button("Minimise").clicked() {
+            ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+        }
+        let max = maximized(ctx);
+        if ui.button(if max { "Restore" } else { "Maximise" }).clicked() {
+            ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
+        }
+        ui.separator();
     }
-    let max = maximized(ctx);
-    if ui.button(if max { "Restore" } else { "Maximise" }).clicked() {
-        ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
-    }
-    ui.separator();
     if ui.button("Close").clicked() {
         ctx.send_viewport_cmd(ViewportCommand::Close);
     }

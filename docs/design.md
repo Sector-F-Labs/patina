@@ -75,6 +75,10 @@ Implemented by `patina::frame`.
   - They're quiet until hovered. Close turns red (`#c01c28`, GNOME's, as a default) with a white
     icon on hover.
   - Their colours are skinned apart from the app's buttons.
+  - Where the compositor can't minimise or maximise (dwl), only close is shown, and the window
+    menu and double-click leave those out too. `frame::can_minimise_and_maximise` decides, for now
+    from a table of compositors by process name, because winit 0.30 drops Wayland's
+    `wm_capabilities` (ADR-0008).
 - **On the bar's empty space:** drag to move, double-click to maximise or restore, right-click
   for a window menu.
 - **Edges:** a one-pixel border in the window stroke colour, and invisible resize handles 5 px
