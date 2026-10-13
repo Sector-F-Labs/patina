@@ -6,6 +6,7 @@
 //! - [`frame`]: the app's own window frame, header bar and resize edges.
 //! - [`appearance`]: following the desktop's light/dark setting.
 //! - [`skin`]: skins in the suite format, shared by every app.
+//! - [`tabs`]: tabs in the title bar, in place of the window title.
 //! - [`tree`]: a lazily loaded sidebar folder tree.
 //! - [`ime`]: stops the input method keeping an idle window repainting.
 
@@ -13,6 +14,7 @@ pub mod appearance;
 pub mod frame;
 pub mod ime;
 pub mod skin;
+pub mod tabs;
 pub mod tree;
 
 /// The egui Patina is built on, so apps use the same version.

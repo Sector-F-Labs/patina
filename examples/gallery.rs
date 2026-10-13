@@ -14,6 +14,7 @@ use eframe::egui;
 use patina::ime;
 use patina::frame::{self, FrameStyle, TitleBar};
 use patina::skin::{self, Skin};
+use patina::tabs::{self, TabAction, TabStrip};
 use patina::tree::FolderTree;
 
 fn main() -> eframe::Result {
@@ -40,6 +41,11 @@ struct Gallery {
     light_dark: egui::ThemePreference,
     /// Problems loading skins, shown in the Skin menu.
     skin_errors: Vec<String>,
+    /// The title bar's tabs, in place of a title, and the one shown.
+    tabs: Vec<String>,
+    tab: usize,
+    /// Tabs opened, for naming the next.
+    opened: usize,
     tree: FolderTree,
     current: PathBuf,
     text: String,
@@ -72,6 +78,9 @@ impl Gallery {
             skin,
             light_dark,
             skin_errors,
+            tabs: vec!["Patina Gallery".into(), "Tab 2".into()],
+            tab: 0,
+            opened: 2,
             tree: FolderTree::new(root.clone(), label),
             current: root,
             text: "Some text".into(),
@@ -141,9 +150,11 @@ impl Gallery {
         }
     }
 
-    fn header(&mut self, ui: &mut egui::Ui, style: &FrameStyle) {
+    fn header(&mut self, ui: &mut egui::Ui, style: &FrameStyle, span: egui::Rangef) -> Option<TabAction> {
         let ctx = ui.ctx().clone();
-        TitleBar::new("Patina Gallery", style).custom(self.custom_frame).menu_bar(true).show(
+        let mut action = None;
+        // No title: the tabs take its place.
+        TitleBar::new("", style).custom(self.custom_frame).menu_bar(true).show(
             ui,
             |ui| {
                 ui.menu_button("View", |ui| {
@@ -152,12 +163,33 @@ impl Gallery {
                     }
                 });
                 ui.menu_button("Skin", |ui| self.skin_menu(ui));
+                action = TabStrip::new(&self.tabs, self.tab, style).span(span).show(ui);
             },
             |ui| {
                 let _ = ui.button("Right");
                 ui.label(egui::RichText::new("right-hand controls").weak());
             },
         );
+        action
+    }
+
+    /// Opens, shows or closes a tab, keeping at least one.
+    fn tab_action(&mut self, action: TabAction) {
+        match action {
+            TabAction::New => {
+                self.opened += 1;
+                self.tabs.push(format!("Tab {}", self.opened));
+                self.tab = self.tabs.len() - 1;
+            }
+            TabAction::Show(i) => self.tab = i,
+            TabAction::Close(i) if self.tabs.len() > 1 => {
+                self.tabs.remove(i);
+                if i < self.tab || self.tab == self.tabs.len() {
+                    self.tab -= 1;
+                }
+            }
+            TabAction::Close(_) => {}
+        }
     }
 
     fn widgets(&mut self, ui: &mut egui::Ui) {
@@ -244,9 +276,17 @@ impl eframe::App for Gallery {
         let style = self.skins[self.skin].frame_style(ui.visuals());
         let radius = if self.custom_frame { frame::corner_radius(&ctx, style.radius) } else { 0 };
 
-        egui::Panel::top("header")
-            .frame(frame::header_frame(ui.style(), &style, radius))
-            .show(ui, |ui| self.header(ui, &style));
+        // Taken before the widgets see them.
+        let mut action = tabs::keys(&ctx, self.tabs.len(), self.tab);
+        let header = frame::header_frame(ui.style(), &style, radius);
+        egui::Panel::top("header").frame(header).show(ui, |ui| {
+            // The bar's full height, padding and all, for the tabs to fill.
+            let span = (ui.max_rect() + header.inner_margin).y_range();
+            action = action.or(self.header(ui, &style, span));
+        });
+        if let Some(action) = action {
+            self.tab_action(action);
+        }
 
         // The panels holding the window's bottom corners round them.
         egui::Panel::left("sidebar")

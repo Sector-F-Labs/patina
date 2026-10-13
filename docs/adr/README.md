@@ -50,6 +50,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0006](0006-title-bar-menus-left-output-actions-right.md) | Title bar: word menus on the left, the app's output actions on the right | Accepted |
 | [0007](0007-unity-in-variety.md) | Unity in variety: the structure is shared, the skin varies, and GNOME is only a source of defaults | Accepted |
 | [0008](0008-window-buttons-follow-the-compositor.md) | Show only the window buttons the compositor supports, found by compositor name for now | Accepted |
+| [0009](0009-tabs-in-the-title-bar.md) | Tabs in the title bar, as a component apps fill with their own tabs | Proposed |
 
 ## Decision Relationship
 
@@ -65,6 +66,7 @@ flowchart TD
     D --> G[0007: Unity in variety]
     C --> G
     C --> H[0008: Window buttons follow the compositor]
+    F --> I[0009: Tabs in the title bar]
 ```
 
 ## Revisit Triggers
