@@ -48,6 +48,9 @@ Patina re-exports `egui`, and an app has to use the same egui version.
   never block the UI.
 - **`ime`**: `drop_repeated_preedits`, for `App::raw_input_hook`. Without it, a focused text field
   on GNOME's Wayland keeps the window repainting at full speed.
+- **`open`**: `open::path` opens a file or folder in the desktop's app for it (`xdg-open` on
+  Linux), so "Open skins folder" lands in the file manager. egui's `open_url` would send a
+  `file://` URL to the web browser.
 
 Known problems and what's understood about them are in [docs/known-issues.md](docs/known-issues.md).
 Traps any egui app can fall into, such as burning a core while idle, are in

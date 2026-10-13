@@ -54,3 +54,14 @@ if !response.has_focus() {
 ```
 
 A focused text field still repaints a few times a second to blink its cursor. That's expected.
+
+## `open_url` with a `file://` URL opens the web browser
+
+`Context::open_url` is for web links. eframe passes the URL to the `webbrowser` crate, which starts
+the browser even for `file://`, so a folder opens as a directory listing in Firefox instead of in
+the file manager. Photograph, md-chat and Notebook all did this for "Open skins folder". Use
+`patina::open::path` for files and folders, which asks the desktop (`xdg-open` on Linux):
+
+```rust
+let _ = patina::open::path(&dir);
+```

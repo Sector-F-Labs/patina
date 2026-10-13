@@ -51,6 +51,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0007](0007-unity-in-variety.md) | Unity in variety: the structure is shared, the skin varies, and GNOME is only a source of defaults | Accepted |
 | [0008](0008-window-buttons-follow-the-compositor.md) | Show only the window buttons the compositor supports, found by compositor name for now | Accepted |
 | [0009](0009-tabs-in-the-title-bar.md) | Tabs in the title bar, as a component apps fill with their own tabs | Proposed |
+| [0010](0010-open-files-with-the-desktop.md) | Open files and folders with the desktop's opener, through `patina::open` | Proposed |
 
 ## Decision Relationship
 
@@ -67,6 +68,7 @@ flowchart TD
     C --> G
     C --> H[0008: Window buttons follow the compositor]
     F --> I[0009: Tabs in the title bar]
+    A --> J[0010: Open files with the desktop]
 ```
 
 ## Revisit Triggers

@@ -9,10 +9,12 @@
 //! - [`tabs`]: tabs in the title bar, in place of the window title.
 //! - [`tree`]: a lazily loaded sidebar folder tree.
 //! - [`ime`]: stops the input method keeping an idle window repainting.
+//! - [`open`]: opens files and folders in the desktop's apps, not the browser.
 
 pub mod appearance;
 pub mod frame;
 pub mod ime;
+pub mod open;
 pub mod skin;
 pub mod tabs;
 pub mod tree;
