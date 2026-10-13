@@ -23,7 +23,7 @@ The format began as UnAmp's skins (UnAmp ADR-0024) and moved here in
 | **Notebook** | Patina's [`skins/notebook.toml`](../skins/notebook.toml), in every app | A leather-brown title bar over cream paper; Notebook starts in it |
 | **Steam Classic** | Patina's [`skins/steam-classic.toml`](../skins/steam-classic.toml), in every app | The olive-green VGUI look of the 2003–2008 Steam client, square corners; its comments document the format |
 | An app's built-ins | Compiled into that app | Anything only that app should offer |
-| Yours | `~/.config/patina/skins/*.toml`, read by every Patina app, plus any folder of the app's own | Anything |
+| Yours | The app's own folder, `~/.config/<app>/skins/*.toml` (`~/.config/notebook/skins`, say) | Anything; copy a file into another app's folder to use it there too |
 
 A skin with the same `name` as one listed before it **replaces** it. That's how you customise a
 built-in: copy it into your folder (apps offer "Copy built-in skins to folder", which never
@@ -138,9 +138,9 @@ analyzer and time display (see UnAmp's `docs/skinning.md`).
 ```rust
 use patina::skin::{self, Skin};
 
-// Default, Patina's built-ins, the app's own, then the user's folders.
+// Default, Patina's built-ins, the app's own, then the user's folder.
 let built_ins = [skin::BUILT_IN, MY_BUILT_INS].concat();
-let dirs: Vec<_> = skin::shared_dir().into_iter().chain(my_app_dir()).collect();
+let dirs: Vec<_> = skin::app_dir("myapp").into_iter().collect();  // ~/.config/myapp/skins
 let (skins, errors) = skin::load_all(&built_ins, &dirs);
 
 let chosen: &Skin = &skins[i];

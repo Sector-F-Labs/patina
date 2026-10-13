@@ -45,13 +45,14 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0001](0001-one-crate-for-the-suite.md) | Share the suite's frame and components as one published crate, Patina | Accepted |
 | [0002](0002-adrs-in-every-patina-app.md) | Recommend ADRs for every Patina app, and keep them for Patina itself | Accepted |
 | [0003](0003-frame-api.md) | The frame's API: a TitleBar builder with left and right slots, styled by FrameStyle | Proposed |
-| [0004](0004-skins-in-patina.md) | Move the suite skin format into Patina, with a shared skins folder and Dark Orange built in | Proposed |
+| [0004](0004-skins-in-patina.md) | Move the suite skin format into Patina, with a shared skins folder and Dark Orange built in | Proposed; folder superseded by [0011](0011-each-app-its-own-skins-folder.md) |
 | [0005](0005-app-skins-built-into-patina.md) | Build Calendar, Notebook and Steam Classic into Patina, and colour controls on a coloured bar | Accepted |
 | [0006](0006-title-bar-menus-left-output-actions-right.md) | Title bar: word menus on the left, the app's output actions on the right | Accepted |
 | [0007](0007-unity-in-variety.md) | Unity in variety: the structure is shared, the skin varies, and GNOME is only a source of defaults | Accepted |
 | [0008](0008-window-buttons-follow-the-compositor.md) | Show only the window buttons the compositor supports, found by compositor name for now | Accepted |
 | [0009](0009-tabs-in-the-title-bar.md) | Tabs in the title bar, as a component apps fill with their own tabs | Proposed |
 | [0010](0010-open-files-with-the-desktop.md) | Open files and folders with the desktop's opener, through `patina::open` | Proposed |
+| [0011](0011-each-app-its-own-skins-folder.md) | Each app keeps its own skins folder, `~/.config/<app>/skins` | Accepted |
 
 ## Decision Relationship
 
@@ -69,6 +70,7 @@ flowchart TD
     C --> H[0008: Window buttons follow the compositor]
     F --> I[0009: Tabs in the title bar]
     A --> J[0010: Open files with the desktop]
+    D -->|folder superseded by| K[0011: Each app its own skins folder]
 ```
 
 ## Revisit Triggers

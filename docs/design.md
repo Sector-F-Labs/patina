@@ -102,12 +102,13 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
   - **Default:** stock egui, following the desktop.
   - **Patina's built-ins:** Dark Orange (Photograph's look), Calendar, Notebook and Steam Classic.
   - **The app's own built-ins.**
-  - **The user's skins:** in `~/.config/patina/skins/`, shared by every app.
+  - **The user's skins:** in the app's own `~/.config/<app>/skins/`. Each app keeps its own
+    ([ADR-0011](adr/0011-each-app-its-own-skins-folder.md)).
 - **A home skin, if it suits the app:** an app may start in a skin that fits it, before the user
   picks one. Photograph starts in Dark Orange, Calendar in Calendar and Notebook in Notebook.
   This is optional and not one of the rules: UnAmp has none and starts in Default. Whatever the
   app starts in, it offers every skin.
-- **Within the rules:** a skin dropped into any app brings its shared look with it. The app's
+- **Within the rules:** a skin copied into any app's folder brings its shared look with it. The app's
   own section waits until that app reads the file. This is how an app can look completely
   different from its siblings while sharing everything else: unity in the structure, variety in
   the skin (principle 3).

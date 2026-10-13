@@ -4,6 +4,9 @@ Date: 2026-10-11
 
 ## Status
 
+The shared folder is superseded by [ADR-0011](0011-each-app-its-own-skins-folder.md): each app
+keeps its own. The rest stands.
+
 Proposed. The user asked for UnAmp's TOML skins (not its Winamp skins) to move into Patina, and
 for Photograph's look to be built in as "Dark Orange" in the gallery's skin menu. The API, the
 shared folder and the built-ins split below are my design.

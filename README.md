@@ -39,8 +39,8 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`frame`**: the app's own window frame, with a header bar, minimise/maximise/close buttons, resize
   edges and rounded corners. Moving and resizing go to the compositor.
 - **`appearance`**: follows the desktop's light/dark setting through the XDG portal.
-- **`skin`**: skins in the suite format, which every app reads, with app sections, a shared
-  user folder and the built-ins Dark Orange, Calendar, Notebook and Steam Classic. See [docs/skinning.md](docs/skinning.md).
+- **`skin`**: skins in the suite format, which every app reads, with app sections, a skins
+  folder per app (`skin::app_dir`) and the built-ins Dark Orange, Calendar, Notebook and Steam Classic. See [docs/skinning.md](docs/skinning.md).
 - **`tabs`**: tabs in the title bar after the menus, in place of the window title: each square and the
   bar's full height, the shown one joined to the panel below, with a close cross on hover, `+`, and
   Ctrl+Shift+T and Ctrl+PageUp/PageDown. The app owns the tabs and applies the `TabAction`s.

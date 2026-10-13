@@ -1,8 +1,8 @@
 # Steam Classic — the olive-green VGUI look of the 2003–2008 Steam client.
 #
 # This file doubles as a commented reference for the skin format (see
-# docs/skinning.md). Copy it to ~/.config/patina/skins/<anything>.toml, change
-# `name`, and pick it from the Skins menu. Every colour is optional: anything
+# docs/skinning.md). Copy it to an app's ~/.config/<app>/skins/ folder as
+# <anything>.toml, change `name`, and pick it from the Skins menu. Every colour is optional: anything
 # left out keeps egui's default for the `base` theme. Colours are "#RRGGBB"
 # or "#RRGGBBAA".
 

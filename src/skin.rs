@@ -10,7 +10,8 @@
 //!
 //! "Default" is stock egui following the desktop's light/dark setting.
 //! Others are built in ([`BUILT_IN`], plus any an app adds) or loaded from
-//! folders: the suite's shared one ([`shared_dir`]) and any of the app's own.
+//! the app's own skins folder ([`app_dir`]). Each app has its own folder;
+//! a skin file still works in any app it's copied into.
 
 use std::path::{Path, PathBuf};
 
@@ -365,8 +366,15 @@ fn deserialize<T: DeserializeOwned>(value: toml::Value, prefix: &str) -> Result<
     Ok((out, ignored))
 }
 
-/// The suite's shared skin folder, `~/.config/patina/skins`, read by every
-/// Patina app.
+/// The app's own skins folder, `~/.config/<app>/skins`, next to its config.
+/// Pass the name of the app's config folder (`"notebook"`, `"unamp"`). Load
+/// from it, and point the skin menu's Copy and Open at it (ADR-0011).
+pub fn app_dir(app: &str) -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join(app).join("skins"))
+}
+
+/// The folder every app used to share, `~/.config/patina/skins`.
+#[deprecated(since = "0.1.7", note = "each app keeps its own skins: use `app_dir` (ADR-0011)")]
 pub fn shared_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("patina").join("skins"))
 }

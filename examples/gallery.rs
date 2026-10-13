@@ -130,7 +130,7 @@ impl Gallery {
             self.skin = self.skins.iter().position(|t| t.name == name).unwrap_or(0);
             changed = true;
         }
-        if let Some(dir) = skin::shared_dir() {
+        if let Some(dir) = skin::app_dir(GALLERY) {
             let resp = ui.button("Copy built-in skins to folder").on_hover_text(dir.display().to_string());
             if resp.clicked() {
                 match skin::export_built_ins(&dir, skin::BUILT_IN) {
@@ -264,9 +264,12 @@ impl Gallery {
     }
 }
 
-/// Patina's built-in skins and the suite's shared folder.
+/// The gallery's skins folder is `~/.config/patina-gallery/skins`.
+const GALLERY: &str = "patina-gallery";
+
+/// Patina's built-in skins and the gallery's own folder.
 fn load_skins() -> (Vec<Skin>, Vec<String>) {
-    skin::load_all(skin::BUILT_IN, &skin::shared_dir().into_iter().collect::<Vec<_>>())
+    skin::load_all(skin::BUILT_IN, &skin::app_dir(GALLERY).into_iter().collect::<Vec<_>>())
 }
 
 impl eframe::App for Gallery {
