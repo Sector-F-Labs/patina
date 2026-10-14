@@ -53,6 +53,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0009](0009-tabs-in-the-title-bar.md) | Tabs in the title bar, as a component apps fill with their own tabs | Proposed |
 | [0010](0010-open-files-with-the-desktop.md) | Open files and folders with the desktop's opener, through `patina::open` | Proposed |
 | [0011](0011-each-app-its-own-skins-folder.md) | Each app keeps its own skins folder, `~/.config/<app>/skins` | Accepted |
+| [0012](0012-tab-strip-without-new-tabs.md) | TabStrip can leave out new tabs and name what a tab is | Proposed |
 
 ## Decision Relationship
 
@@ -71,6 +72,7 @@ flowchart TD
     F --> I[0009: Tabs in the title bar]
     A --> J[0010: Open files with the desktop]
     D -->|folder superseded by| K[0011: Each app its own skins folder]
+    I --> L[0012: Tab strip without new tabs]
 ```
 
 ## Revisit Triggers

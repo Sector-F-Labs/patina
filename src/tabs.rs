@@ -60,11 +60,37 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     span: Option<egui::Rangef>,
     id: Id,
     new_hint: &'a str,
+    new_tab: bool,
+    noun: &'a str,
 }
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     pub fn new(titles: &'a [T], shown: usize, style: &FrameStyle) -> Self {
-        Self { titles, shown, bar: style.title_bar, span: None, id: Id::new("patina_tabs"), new_hint: "New Tab (Ctrl+Shift+T)" }
+        Self {
+            titles,
+            shown,
+            bar: style.title_bar,
+            span: None,
+            id: Id::new("patina_tabs"),
+            new_hint: "New Tab (Ctrl+Shift+T)",
+            new_tab: true,
+            noun: "Tab",
+        }
+    }
+
+    /// Whether to end with the `+` tab and offer "New" in a tab's menu:
+    /// off for tabs the app doesn't create, such as a desktop bar's list of
+    /// open windows (ADR-0012).
+    pub fn new_tab(mut self, new_tab: bool) -> Self {
+        self.new_tab = new_tab;
+        self
+    }
+
+    /// What a tab is, for the menu and the close button: "Close Tab" by
+    /// default, "Close Window" with `noun("Window")`.
+    pub fn noun(mut self, noun: &'a str) -> Self {
+        self.noun = noun;
+        self
     }
 
     /// How far the tabs reach up and down: the bar's full height, padding
@@ -101,14 +127,16 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         ui.separator();
         ui.spacing_mut().item_spacing.x = 0.0;
         let n = self.titles.len().max(1) as f32;
-        let width = ((ui.available_width() - PLUS) / n).clamp(48.0, 200.0);
+        let plus = if self.new_tab { PLUS } else { 0.0 };
+        let width = ((ui.available_width() - plus) / n).clamp(48.0, 200.0);
+        let close_label = format!("Close {}", self.noun);
         for (i, title) in self.titles.iter().enumerate() {
             let title = title.as_ref();
             let (fill, ink) = if i == self.shown { (Some(shown), global.visuals.strong_text_color()) } else { (None, ink) };
             let (id, close_id) = self.tab_id(i);
             let response = tab(ui, id, width, self.span, title, fill, ink).on_hover_text(title);
             // Hovered, a tab has a close button, after its own registration so it wins.
-            if ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink) {
+            if ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
                 action = Some(TabAction::Close(i));
             } else if response.clicked() {
                 action = Some(TabAction::Show(i));
@@ -117,17 +145,17 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
                 action = Some(TabAction::Close(i));
             }
             response.context_menu(|ui| {
-                if ui.button("New Tab").clicked() {
+                if self.new_tab && ui.button(format!("New {}", self.noun)).clicked() {
                     action = Some(TabAction::New);
                     ui.close();
                 }
-                if ui.button("Close Tab").clicked() {
+                if ui.button(&close_label).clicked() {
                     action = Some(TabAction::Close(i));
                     ui.close();
                 }
             });
         }
-        if tab(ui, self.id.with("new"), PLUS, self.span, "+", None, ink).on_hover_text(self.new_hint).clicked() {
+        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, "+", None, ink).on_hover_text(self.new_hint).clicked() {
             action = Some(TabAction::New);
         }
         action
@@ -173,9 +201,9 @@ fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: 
 }
 
 /// A tab's close button, a cross at its right end; whether it was clicked.
-fn close(ui: &mut egui::Ui, id: Id, tab: Rect, ink: Color32) -> bool {
+fn close(ui: &mut egui::Ui, id: Id, tab: Rect, ink: Color32, label: &str) -> bool {
     let rect = Rect::from_center_size(egui::pos2(tab.right() - 6.0 - CLOSE / 2.0, tab.center().y), egui::Vec2::splat(CLOSE));
-    let response = ui.interact(rect, id, egui::Sense::click()).on_hover_text("Close Tab");
+    let response = ui.interact(rect, id, egui::Sense::click()).on_hover_text(label);
     if response.hovered() {
         ui.painter().rect_filled(rect, 0.0, ui.visuals().widgets.active.weak_bg_fill);
     }
@@ -202,6 +230,10 @@ mod tests {
     /// A frame of a title bar with two tabs, the second shown. Needs
     /// `time`, or every click lands in one multi-click burst.
     fn bar(ctx: &egui::Context, events: Vec<Event>) -> Option<TabAction> {
+        bar_with(ctx, events, true)
+    }
+
+    fn bar_with(ctx: &egui::Context, events: Vec<Event>, new_tab: bool) -> Option<TabAction> {
         let time = TIME.with(|t| {
             t.set(t.get() + 0.05);
             t.get()
@@ -214,7 +246,7 @@ mod tests {
             let header = frame::header_frame(ui.style(), &style, 0);
             egui::Panel::top("header").frame(header).show(ui, |ui| {
                 let span = (ui.max_rect() + header.inner_margin).y_range();
-                TitleBar::new("", &style).menu_bar(true).show(ui, |ui| action = TabStrip::new(&TITLES, 1, &style).span(span).show(ui), |_| {});
+                TitleBar::new("", &style).menu_bar(true).show(ui, |ui| action = TabStrip::new(&TITLES, 1, &style).span(span).new_tab(new_tab).show(ui), |_| {});
             });
         });
         action
@@ -259,6 +291,18 @@ mod tests {
         bar(&ctx, vec![]);
         let last = ctx.read_response(ids(1).0).unwrap().rect;
         assert_eq!(click(&ctx, pos2(last.right() + PLUS / 2.0, last.center().y)), Some(TabAction::New));
+    }
+
+    #[test]
+    fn without_new_tabs_there_is_no_plus() {
+        let ctx = egui::Context::default();
+        bar_with(&ctx, vec![], false);
+        let last = ctx.read_response(ids(1).0).unwrap().rect;
+        let at = pos2(last.right() + PLUS / 2.0, last.center().y);
+        bar_with(&ctx, vec![Event::PointerMoved(at)], false);
+        bar_with(&ctx, vec![button(at, true)], false);
+        assert_eq!(bar_with(&ctx, vec![button(at, false)], false), None);
+        assert!(ctx.read_response(Id::new("patina_tabs").with("new")).is_none());
     }
 
     #[test]
