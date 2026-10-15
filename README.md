@@ -42,7 +42,7 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`skin`**: skins in the suite format, which every app reads, with app sections, a skins
   folder per app (`skin::app_dir`) and the built-ins Dark Orange, Calendar, Notebook and Steam Classic. See [docs/skinning.md](docs/skinning.md).
 - **`tabs`**: tabs in the title bar after the menus, in place of the window title: each square and the
-  bar's full height, the shown one joined to the panel below, with a close cross on hover, `+`, and
+  bar's full height, the shown one joined to the panel below, with a close cross on hover and `+` (each optional: `closable`, `new_tab`), and
   Ctrl+Shift+T, Ctrl+PageUp/PageDown and Alt+1 to Alt+9. The app owns the tabs and applies the
   `TabAction`s.
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares

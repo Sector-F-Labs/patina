@@ -61,6 +61,7 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     id: Id,
     new_hint: &'a str,
     new_tab: bool,
+    closable: bool,
     noun: &'a str,
 }
 
@@ -74,8 +75,18 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             id: Id::new("patina_tabs"),
             new_hint: "New Tab (Ctrl+Shift+T)",
             new_tab: true,
+            closable: true,
             noun: "Tab",
         }
+    }
+
+    /// Whether a tab can be closed, from its cross, a middle click or its
+    /// menu: off for tabs that are views the app always has, such as a
+    /// messenger's chat folders (ADR-0014). `TabAction::Close` then never
+    /// comes from the strip.
+    pub fn closable(mut self, closable: bool) -> Self {
+        self.closable = closable;
+        self
     }
 
     /// Whether to end with the `+` tab and offer "New" in a tab's menu:
@@ -134,28 +145,30 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             let title = title.as_ref();
             let (fill, ink) = if i == self.shown { (Some(shown), global.visuals.strong_text_color()) } else { (None, ink) };
             let (id, close_id) = self.tab_id(i);
-            let response = tab(ui, id, width, self.span, title, fill, ink).on_hover_text(title);
+            let response = tab(ui, id, width, self.span, title, fill, ink, self.closable).on_hover_text(title);
             // Hovered, a tab has a close button, after its own registration so it wins.
-            if ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
+            if self.closable && ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
                 action = Some(TabAction::Close(i));
             } else if response.clicked() {
                 action = Some(TabAction::Show(i));
             }
-            if response.middle_clicked() {
+            if self.closable && response.middle_clicked() {
                 action = Some(TabAction::Close(i));
             }
-            response.context_menu(|ui| {
-                if self.new_tab && ui.button(format!("New {}", self.noun)).clicked() {
-                    action = Some(TabAction::New);
-                    ui.close();
-                }
-                if ui.button(&close_label).clicked() {
-                    action = Some(TabAction::Close(i));
-                    ui.close();
-                }
-            });
+            if self.new_tab || self.closable {
+                response.context_menu(|ui| {
+                    if self.new_tab && ui.button(format!("New {}", self.noun)).clicked() {
+                        action = Some(TabAction::New);
+                        ui.close();
+                    }
+                    if self.closable && ui.button(&close_label).clicked() {
+                        action = Some(TabAction::Close(i));
+                        ui.close();
+                    }
+                });
+            }
         }
-        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, "+", None, ink).on_hover_text(self.new_hint).clicked() {
+        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, "+", None, ink, false).on_hover_text(self.new_hint).clicked() {
             action = Some(TabAction::New);
         }
         action
@@ -194,9 +207,10 @@ pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction
 }
 
 /// A tab: `width` wide in the row, `span` tall, square whatever the skin's
-/// rounding, filled with `fill`, else when hovered. A tab wide enough for a
-/// close button keeps its text clear of one.
-fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: &str, fill: Option<Color32>, ink: Color32) -> egui::Response {
+/// rounding, filled with `fill`, else when hovered. A closable tab wide
+/// enough for a close button keeps its text clear of one.
+#[allow(clippy::too_many_arguments)]
+fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: &str, fill: Option<Color32>, ink: Color32, closable: bool) -> egui::Response {
     let (row, _) = ui.allocate_exact_size(egui::vec2(width, ui.spacing().interact_size.y), egui::Sense::hover());
     let rect = Rect::from_x_y_ranges(row.x_range(), span.unwrap_or(row.y_range()));
     let response = ui.interact(rect, id, egui::Sense::click());
@@ -205,7 +219,7 @@ fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: 
     if let Some(fill) = fill.or_else(|| ui.rect_contains_pointer(rect).then(|| ui.visuals().widgets.hovered.weak_bg_fill)) {
         painter.rect_filled(rect, 0.0, fill);
     }
-    let room = if width > 4.0 * CLOSE { width - 2.0 * CLOSE - 8.0 } else { width - 16.0 };
+    let room = if closable && width > 4.0 * CLOSE { width - 2.0 * CLOSE - 8.0 } else { width - 16.0 };
     // Coloured here: the bar's override colour would win over the painter's.
     let galley = egui::WidgetText::from(egui::RichText::new(text).color(ink)).into_galley(ui, Some(egui::TextWrapMode::Truncate), room, egui::TextStyle::Body);
     painter.galley(rect.center() - galley.size() / 2.0, galley, ink);
@@ -242,10 +256,10 @@ mod tests {
     /// A frame of a title bar with two tabs, the second shown. Needs
     /// `time`, or every click lands in one multi-click burst.
     fn bar(ctx: &egui::Context, events: Vec<Event>) -> Option<TabAction> {
-        bar_with(ctx, events, true)
+        bar_with(ctx, events, true, true)
     }
 
-    fn bar_with(ctx: &egui::Context, events: Vec<Event>, new_tab: bool) -> Option<TabAction> {
+    fn bar_with(ctx: &egui::Context, events: Vec<Event>, new_tab: bool, closable: bool) -> Option<TabAction> {
         let time = TIME.with(|t| {
             t.set(t.get() + 0.05);
             t.get()
@@ -258,7 +272,7 @@ mod tests {
             let header = frame::header_frame(ui.style(), &style, 0);
             egui::Panel::top("header").frame(header).show(ui, |ui| {
                 let span = (ui.max_rect() + header.inner_margin).y_range();
-                TitleBar::new("", &style).menu_bar(true).show(ui, |ui| action = TabStrip::new(&TITLES, 1, &style).span(span).new_tab(new_tab).show(ui), |_| {});
+                TitleBar::new("", &style).menu_bar(true).show(ui, |ui| action = TabStrip::new(&TITLES, 1, &style).span(span).new_tab(new_tab).closable(closable).show(ui), |_| {});
             });
         });
         action
@@ -308,13 +322,34 @@ mod tests {
     #[test]
     fn without_new_tabs_there_is_no_plus() {
         let ctx = egui::Context::default();
-        bar_with(&ctx, vec![], false);
+        bar_with(&ctx, vec![], false, true);
         let last = ctx.read_response(ids(1).0).unwrap().rect;
         let at = pos2(last.right() + PLUS / 2.0, last.center().y);
-        bar_with(&ctx, vec![Event::PointerMoved(at)], false);
-        bar_with(&ctx, vec![button(at, true)], false);
-        assert_eq!(bar_with(&ctx, vec![button(at, false)], false), None);
+        bar_with(&ctx, vec![Event::PointerMoved(at)], false, true);
+        bar_with(&ctx, vec![button(at, true)], false, true);
+        assert_eq!(bar_with(&ctx, vec![button(at, false)], false, true), None);
         assert!(ctx.read_response(Id::new("patina_tabs").with("new")).is_none());
+    }
+
+    #[test]
+    fn a_tab_that_cant_close_has_no_cross_and_ignores_a_middle_click() {
+        let ctx = egui::Context::default();
+        let frame = |events| bar_with(&ctx, events, false, false);
+        frame(vec![]);
+        let tab = ctx.read_response(ids(0).0).unwrap().rect;
+        frame(vec![Event::PointerMoved(tab.center())]);
+        assert!(ctx.read_response(ids(0).1).is_none(), "no cross on a hovered tab");
+        let middle = |pressed| Event::PointerButton {
+            pos: tab.center(),
+            button: PointerButton::Middle,
+            pressed,
+            modifiers: Default::default(),
+        };
+        frame(vec![middle(true)]);
+        assert_eq!(frame(vec![middle(false)]), None);
+        // A click still shows it.
+        frame(vec![button(tab.center(), true)]);
+        assert_eq!(frame(vec![button(tab.center(), false)]), Some(TabAction::Show(0)));
     }
 
     #[test]

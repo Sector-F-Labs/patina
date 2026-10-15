@@ -55,6 +55,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0011](0011-each-app-its-own-skins-folder.md) | Each app keeps its own skins folder, `~/.config/<app>/skins` | Accepted |
 | [0012](0012-tab-strip-without-new-tabs.md) | TabStrip can leave out new tabs and name what a tab is | Proposed |
 | [0013](0013-alt-and-a-number-shows-that-tab.md) | Alt and a number shows that tab | Proposed |
+| [0014](0014-tabs-that-cant-close.md) | TabStrip can show tabs that can't be closed | Proposed |
 
 ## Decision Relationship
 
@@ -75,6 +76,7 @@ flowchart TD
     D -->|folder superseded by| K[0011: Each app its own skins folder]
     I --> L[0012: Tab strip without new tabs]
     I --> M[0013: Alt and a number shows that tab]
+    I --> N[0014: Tabs that can't close]
 ```
 
 ## Revisit Triggers
