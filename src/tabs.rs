@@ -36,7 +36,7 @@ use crate::frame::FrameStyle;
 pub enum TabAction {
     /// Open a new tab: `+`, a tab's menu, or Ctrl+Shift+T.
     New,
-    /// Show this tab: a click, or Ctrl+PageUp/PageDown.
+    /// Show this tab: a click, Ctrl+PageUp/PageDown, or Alt+1 to Alt+9.
     Show(usize),
     /// Close this tab: its cross, a middle click, or its menu.
     Close(usize),
@@ -163,9 +163,16 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
 }
 
 /// Ctrl+Shift+T for a new tab, Ctrl+PageUp/PageDown for the tab before or
-/// after `shown`, of `count`, wrapping round. The keys are consumed, so
-/// call this before the widgets that would otherwise get them.
+/// after `shown`, of `count`, wrapping round, and Alt+1 to Alt+9 for that
+/// tab. The keys are consumed, so call this before the widgets that would
+/// otherwise get them. An Alt+digit is taken, with the digit egui sends after
+/// it as text, only when that tab exists, so past the last tab it still
+/// reaches the app (readline's numeric argument, in a terminal).
 pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction> {
+    const DIGITS: [egui::Key; 9] = {
+        use egui::Key::*;
+        [Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9]
+    };
     ctx.input_mut(|i| {
         let mut action = None;
         if i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::T) {
@@ -176,6 +183,11 @@ pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction
         }
         if count > 0 && i.consume_key(egui::Modifiers::CTRL, egui::Key::PageDown) {
             action = Some(TabAction::Show((shown + 1) % count));
+        }
+        if let Some(n) = DIGITS.iter().take(count).position(|&key| i.consume_key(egui::Modifiers::ALT, key)) {
+            let digit = (n + 1).to_string();
+            i.events.retain(|e| !matches!(e, egui::Event::Text(t) if *t == digit));
+            action = Some(TabAction::Show(n));
         }
         action
     })
@@ -319,5 +331,24 @@ mod tests {
         assert_eq!(cycle(key(egui::Key::PageDown, egui::Modifiers::CTRL), 2), Some(TabAction::Show(0)));
         assert_eq!(cycle(key(egui::Key::T, egui::Modifiers::CTRL | egui::Modifiers::SHIFT), 0), Some(TabAction::New));
         assert_eq!(cycle(key(egui::Key::T, egui::Modifiers::CTRL), 0), None);
+    }
+
+    #[test]
+    fn alt_and_a_number_shows_that_tab_and_takes_its_digit() {
+        let ctx = egui::Context::default();
+        let alt = |key| Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::ALT };
+        let press = |events: Vec<Event>| {
+            let mut out = (None, vec![]);
+            let _ = ctx.run_ui(RawInput { events, ..Default::default() }, |ui| {
+                out = (keys(ui.ctx(), 2, 0), ui.input(|i| i.events.clone()));
+            });
+            out
+        };
+        let (action, left) = press(vec![alt(egui::Key::Num2), Event::Text("2".into())]);
+        assert_eq!(action, Some(TabAction::Show(1)));
+        assert!(left.is_empty(), "{left:?}");
+        // No third tab: Alt+3 and its digit go on to the app.
+        let (action, left) = press(vec![alt(egui::Key::Num3), Event::Text("3".into())]);
+        assert_eq!((action, left.len()), (None, 2));
     }
 }
