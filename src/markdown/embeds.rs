@@ -317,20 +317,69 @@ pub fn image(ui: &mut egui::Ui, image: &mut Image, dir: Option<&Path>, id: Id, e
     out
 }
 
+/// Gives the parts of `job` in `marks` (byte ranges of its text) the
+/// background `colour`, and the `current` one `current_colour`, as find
+/// marks what it found. Sections are split where marks start and end.
+pub fn mark(
+    job: &mut egui::text::LayoutJob,
+    marks: &[std::ops::Range<usize>],
+    current: Option<usize>,
+    colour: egui::Color32,
+    current_colour: egui::Color32,
+) {
+    if marks.is_empty() {
+        return;
+    }
+    let mut cuts: Vec<usize> = marks.iter().flat_map(|m| [m.start, m.end]).collect();
+    cuts.sort_unstable();
+    cuts.dedup();
+    let mut sections = Vec::with_capacity(job.sections.len() + cuts.len());
+    for section in std::mem::take(&mut job.sections) {
+        let (first, last) = (section.byte_range.start.0, section.byte_range.end.0);
+        let mut start = first;
+        let inner = cuts.iter().copied().filter(|&c| c > first && c < last);
+        for end in inner.chain(std::iter::once(last)) {
+            let mut piece = section.clone();
+            piece.byte_range = egui::text::ByteIndex(start)..egui::text::ByteIndex(end);
+            if start > first {
+                piece.leading_space = 0.0;
+            }
+            if let Some(i) = marks.iter().position(|m| m.start <= start && end <= m.end) {
+                piece.format.background = if Some(i) == current { current_colour } else { colour };
+            }
+            sections.push(piece);
+            start = end;
+        }
+    }
+    job.sections = sections;
+}
+
 /// A whole source file, highlighted as a code block is, with line numbers,
 /// for reading: the text can be selected and copied, not changed. `lang`
-/// is a fence tag or a file extension (`rust`, `rs`, `toml`).
-pub fn code_file(ui: &mut egui::Ui, text: &str, lang: &str, id: Id) {
+/// is a fence tag or a file extension (`rust`, `rs`, `toml`). `marks` are
+/// byte ranges to mark, as found text, the `current` one more strongly;
+/// the current one's place on screen is returned, to scroll to.
+pub fn code_file(
+    ui: &mut egui::Ui,
+    text: &str,
+    lang: &str,
+    id: Id,
+    marks: &[std::ops::Range<usize>],
+    current: Option<usize>,
+) -> Option<egui::Rect> {
     let theme = CodeTheme::from_memory(ui.ctx(), ui.style());
     let language = syntax_name(lang);
     let rows = text.lines().count().max(1);
     let digits = rows.to_string().len();
     let numbers: String = (1..=rows).map(|n| format!("{n:>digits$}\n")).collect();
+    let selection = ui.visuals().selection.bg_fill;
     let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, _wrap: f32| {
         // Code isn't wrapped: lines keep their shape, and scroll sideways.
-        let job = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
+        let mut job = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
+        mark(&mut job, marks, current, selection.gamma_multiply(0.35), selection);
         ui.fonts_mut(|f| f.layout_job(job))
     };
+    let mut found = None;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 16.0;
         ui.add(
@@ -338,16 +387,20 @@ pub fn code_file(ui: &mut egui::Ui, text: &str, lang: &str, id: Id) {
                 .selectable(false),
         );
         let mut shown = text;
-        ui.add(
-            egui::TextEdit::multiline(&mut shown)
-                .id(id)
-                .code_editor()
-                .frame(egui::Frame::NONE)
-                .margin(egui::Margin::ZERO)
-                .desired_width(f32::INFINITY)
-                .layouter(&mut layouter),
-        );
+        let output = egui::TextEdit::multiline(&mut shown)
+            .id(id)
+            .code_editor()
+            .frame(egui::Frame::NONE)
+            .margin(egui::Margin::ZERO)
+            .desired_width(f32::INFINITY)
+            .layouter(&mut layouter)
+            .show(ui);
+        found = current.and_then(|i| marks.get(i)).map(|m| {
+            let chars = text[..m.start].chars().count();
+            output.galley.pos_from_cursor(egui::text::CCursor::new(chars)).translate(output.galley_pos.to_vec2())
+        });
     });
+    found
 }
 
 /// Decodes `%20`-style escapes, which markdown image paths often use for
@@ -407,6 +460,17 @@ mod tests {
         // The header row stays first.
         apply(&mut t, TableCommand::InsertRow(0));
         assert_eq!(t.rows.len(), 3);
+    }
+
+    #[test]
+    fn marks_split_sections_where_they_start_and_end() {
+        let mut job = egui::text::LayoutJob::default();
+        job.append("hello world", 0.0, egui::TextFormat::default());
+        let (weak, strong) = (egui::Color32::GRAY, egui::Color32::RED);
+        mark(&mut job, &[0..2, 6..11], Some(1), weak, strong);
+        let pieces: Vec<(std::ops::Range<usize>, egui::Color32)> =
+            job.sections.iter().map(|s| (s.byte_range.start.0..s.byte_range.end.0, s.format.background)).collect();
+        assert_eq!(pieces, [(0..2, weak), (2..6, egui::Color32::TRANSPARENT), (6..11, strong)]);
     }
 
     #[test]

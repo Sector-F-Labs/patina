@@ -153,6 +153,10 @@ pub struct Editor {
     read_only: bool,
     /// A link clicked while read-only, for the app to follow.
     link: Option<String>,
+    /// Text to find, lower-cased by character; marked wherever it appears.
+    search: Vec<char>,
+    /// Scroll the selection into view on the next frame, focused or not.
+    scroll_to_selection: bool,
     id: Id,
 }
 
@@ -178,8 +182,65 @@ impl Editor {
             dir: None,
             read_only: false,
             link: None,
+            search: Vec::new(),
+            scroll_to_selection: false,
             id,
         }
+    }
+
+    /// Marks every place `query` appears in the text, case aside, as find
+    /// does; empty marks nothing. Tables and code blocks aren't searched.
+    pub fn set_search(&mut self, query: &str) {
+        self.search = query.chars().map(fold).collect();
+    }
+
+    /// The places the search text appears: paragraph, and characters.
+    fn matches(&self) -> Vec<(usize, std::ops::Range<usize>)> {
+        let mut found = Vec::new();
+        if self.search.is_empty() {
+            return found;
+        }
+        let n = self.search.len();
+        for (i, para) in self.paras.iter().enumerate() {
+            let Some(line) = para.as_text() else { continue };
+            let hay: Vec<char> = doc::plain(&line.spans).chars().map(fold).collect();
+            let mut at = 0;
+            while at + n <= hay.len() {
+                if hay[at..at + n] == self.search[..] {
+                    found.push((i, at..at + n));
+                    at += n;
+                } else {
+                    at += 1;
+                }
+            }
+        }
+        found
+    }
+
+    /// Selects the next place the search text appears after the selection
+    /// (or before it, going back), wrapping around, and scrolls to it.
+    /// Returns which match it is, from 1, and how many there are.
+    pub fn find(&mut self, forward: bool) -> Option<(usize, usize)> {
+        let found = self.matches();
+        if found.is_empty() {
+            return None;
+        }
+        let (start, _) = self.selection();
+        let here = (start.para, start.col);
+        let on_match = self.has_selection();
+        let index = if forward {
+            found
+                .iter()
+                .position(|(p, r)| if on_match { (*p, r.start) > here } else { (*p, r.start) >= here })
+                .unwrap_or(0)
+        } else {
+            found.iter().rposition(|(p, r)| (*p, r.start) < here).unwrap_or(found.len() - 1)
+        };
+        let (para, range) = found[index].clone();
+        self.anchor = Pos::new(para, range.start);
+        self.cursor = Pos::new(para, range.end);
+        self.scroll_to_selection = true;
+        Some((index + 1, found.len()))
     }
 
     /// Only show the document: select and copy, follow links, no edits.
@@ -1003,6 +1064,8 @@ impl Editor {
         let mut embed_edits: Vec<(usize, Para)> = Vec::new();
         let mut embed_delete = None;
         let top = ui.cursor().min;
+        let found = self.matches();
+        let mark = visuals.selection.bg_fill.gamma_multiply(0.35);
 
         for i in 0..self.paras.len() {
             if let Para::Text(line) = &self.paras[i] {
@@ -1021,6 +1084,9 @@ impl Editor {
                     let start = if i == sel_a.para { sel_a.col } else { 0 };
                     let end = if i == sel_b.para { sel_b.col } else { len };
                     paint_selection(painter, &galley, origin, start, end, i != sel_b.para, visuals.selection.bg_fill);
+                }
+                for (_, range) in found.iter().filter(|(p, _)| *p == i) {
+                    paint_selection(painter, &galley, origin, range.start, range.end, false, mark);
                 }
                 if let Some(rect) = self.paint_marker(ui, &line.block, numbers[i], rect, origin, &galley, &visuals)
                     && ui.interact(rect, self.id.with(("task", i)), Sense::click()).clicked()
@@ -1161,6 +1227,14 @@ impl Editor {
             doc::normalize(&mut self.paras);
             self.cursor = self.fix(Pos::new(i, 0));
             self.anchor = self.cursor;
+        }
+
+        // A found match, brought into view whether or not the editor has focus.
+        if std::mem::take(&mut self.scroll_to_selection)
+            && let Some(Some(placed)) = self.placed.get(self.cursor.para)
+        {
+            let at = placed.galley.pos_from_cursor(CCursor::new(self.cursor.col)).translate(placed.origin.to_vec2());
+            ui.scroll_to_rect(at.expand(48.0), Some(egui::Align::Center));
         }
 
         // The caret, and where the IME should pop up.
@@ -1423,6 +1497,16 @@ fn layout_job(line: &Line, look: &Look, v: &egui::Visuals, width: f32, preedit: 
 
 /// Highlights characters `start..end` of a galley, plus a sliver past the
 /// end of the last row when the selection carries on to the next paragraph.
+/// A character as search compares it: lower-cased, one for one, so
+/// positions in the folded text are positions in the text.
+fn fold(c: char) -> char {
+    let mut lower = c.to_lowercase();
+    match (lower.next(), lower.next()) {
+        (Some(l), None) => l,
+        _ => c,
+    }
+}
+
 fn paint_selection(
     painter: &egui::Painter,
     galley: &Galley,
@@ -1664,6 +1748,25 @@ mod tests {
         assert_eq!(ed.edits(), 0);
         frame(&ctx, &mut ed, &mut t, vec![Event::Copy]);
         assert!(ed.clip.as_ref().is_some_and(|(plain, _)| plain.contains("hello")));
+    }
+
+    #[test]
+    fn find_selects_each_match_in_turn_and_wraps() {
+        let (ctx, mut ed, mut t) = setup("Alpha beta\n\nbeta gamma BETA\n");
+        ed.set_read_only(true);
+        ed.set_search("Beta");
+        assert_eq!(ed.find(true), Some((1, 3)));
+        assert_eq!((ed.anchor, ed.cursor), (Pos::new(0, 6), Pos::new(0, 10)));
+        assert_eq!(ed.find(true), Some((2, 3)));
+        assert_eq!(ed.find(true), Some((3, 3)));
+        assert_eq!(ed.cursor, Pos::new(1, 15));
+        assert_eq!(ed.find(true), Some((1, 3)), "wraps to the first");
+        assert_eq!(ed.find(false), Some((3, 3)), "and back to the last");
+        frame(&ctx, &mut ed, &mut t, vec![]);
+        ed.set_search("nowhere");
+        assert_eq!(ed.find(true), None);
+        ed.set_search("");
+        assert_eq!(ed.find(true), None);
     }
 
     #[test]
