@@ -57,6 +57,8 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0013](0013-alt-and-a-number-shows-that-tab.md) | Alt and a number shows that tab | Proposed |
 | [0014](0014-tabs-that-cant-close.md) | TabStrip can show tabs that can't be closed | Proposed |
 | [0015](0015-markdown-from-notebook.md) | Notebook's markdown display moves into Patina, behind a feature | Accepted |
+| [0016](0016-a-status-bar-for-messages.md) | A status bar along the bottom: the version, then colour-coded messages, then the app's own status | Accepted |
+| [0017](0017-the-skin-menu-holds-only-controls.md) | The skin menu holds only controls, in the same order in every app | Accepted |
 
 ## Decision Relationship
 
@@ -78,6 +80,9 @@ flowchart TD
     I --> L[0012: Tab strip without new tabs]
     I --> M[0013: Alt and a number shows that tab]
     I --> N[0014: Tabs that can't close]
+    C --> O[0016: Status bar for messages]
+    K --> P[0017: Skin menu holds only controls]
+    O --> P
 ```
 
 ## Revisit Triggers

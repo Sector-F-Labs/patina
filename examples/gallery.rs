@@ -39,8 +39,10 @@ struct Gallery {
     skin: usize,
     /// Light, dark or following the desktop, while the skin is Default.
     light_dark: egui::ThemePreference,
-    /// Problems loading skins, shown in the Skin menu.
+    /// Problems loading skins, shown in the status bar until they're fixed.
     skin_errors: Vec<String>,
+    /// The latest message for the status bar (ADR-0016).
+    status: Option<Status>,
     /// The title bar's tabs, in place of a title, and the one shown.
     tabs: Vec<String>,
     tab: usize,
@@ -78,6 +80,7 @@ impl Gallery {
             skin,
             light_dark,
             skin_errors,
+            status: None,
             tabs: vec!["Patina Gallery".into(), "Tab 2".into()],
             tab: 0,
             opened: 2,
@@ -101,11 +104,18 @@ impl Gallery {
         }
     }
 
+    /// The skin menu every app has (ADR-0017): only controls, reporting to the status bar.
     fn skin_menu(&mut self, ui: &mut egui::Ui) {
+        // Size the menu to its widest entry instead of wrapping entries to its first width.
+        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
         let ctx = ui.ctx().clone();
         let mut changed = false;
         for (i, skin) in self.skins.iter().enumerate() {
-            let resp = ui.radio_value(&mut self.skin, i, &skin.name);
+            let label = match &skin.author {
+                Some(author) if skin.path.is_some() => format!("{} — {author}", skin.name),
+                _ => skin.name.clone(),
+            };
+            let resp = ui.radio_value(&mut self.skin, i, label);
             let resp = match (&skin.path, &skin.author) {
                 (Some(path), _) => resp.on_hover_text(path.display().to_string()),
                 (None, Some(author)) => resp.on_hover_text(format!("Built in, by {author}")),
@@ -125,29 +135,67 @@ impl Gallery {
         });
         ui.separator();
         if ui.button("Reload skins").clicked() {
-            let name = self.skins[self.skin].name.clone();
-            (self.skins, self.skin_errors) = load_skins();
-            self.skin = self.skins.iter().position(|t| t.name == name).unwrap_or(0);
+            self.reload_skins();
             changed = true;
         }
         if let Some(dir) = skin::app_dir(GALLERY) {
-            let resp = ui.button("Copy built-in skins to folder").on_hover_text(dir.display().to_string());
+            let resp = ui
+                .button("Copy built-in skins to folder")
+                .on_hover_text("Puts editable copies in the skins folder; never overwrites existing files");
             if resp.clicked() {
-                match skin::export_built_ins(&dir, skin::BUILT_IN) {
-                    Ok(export) => eprintln!("copied {:?}, kept {:?} in {}", export.copied, export.skipped, dir.display()),
-                    Err(e) => self.skin_errors.push(e),
-                }
+                self.status = Some(match skin::export_built_ins(&dir, skin::BUILT_IN) {
+                    Ok(export) => {
+                        // The copies share the built-ins' names, so after a reload they're the
+                        // versions in use.
+                        self.reload_skins();
+                        changed = true;
+                        Status::info(export_summary(&export.copied, &export.skipped))
+                    }
+                    Err(e) => Status::error(format!("Couldn't copy skins: {e}")),
+                });
             }
-        }
-        if !self.skin_errors.is_empty() {
-            ui.separator();
-            for error in &self.skin_errors {
-                ui.colored_label(ui.visuals().error_fg_color, error);
+            if ui.button("Open skins folder").on_hover_text(dir.display().to_string()).clicked() {
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = patina::open::path(&dir);
             }
         }
         if changed {
             self.apply_skin(&ctx);
         }
+    }
+
+    /// Rescans the built-in and user skins, keeping the one in use by name.
+    fn reload_skins(&mut self) {
+        let name = self.skins[self.skin].name.clone();
+        (self.skins, self.skin_errors) = load_skins();
+        self.skin = self.skins.iter().position(|t| t.name == name).unwrap_or(0);
+    }
+
+    /// The status bar (ADR-0016): the version, then the latest message coloured by its level,
+    /// then the app's own standing information on the right, which the gallery has none of.
+    fn status_bar(&self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            // Just the version: the app's name is already in the title bar and the window list,
+            // so repeating it here adds nothing.
+            ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).weak().small());
+            // Skins that failed to load stay until they load, ahead of any newer message.
+            let skin_errors = (!self.skin_errors.is_empty()).then(|| {
+                let n = self.skin_errors.len();
+                Status::error(format!("Couldn't load {n} skin{}", if n == 1 { "" } else { "s" }))
+            });
+            if let Some(status) = skin_errors.as_ref().or(self.status.as_ref()) {
+                ui.separator();
+                let color = match status.level {
+                    Level::Error => ui.visuals().error_fg_color,
+                    Level::Warn => ui.visuals().warn_fg_color,
+                    Level::Info => ui.visuals().weak_text_color(),
+                };
+                let resp = ui.label(egui::RichText::new(&status.text).color(color).small());
+                if skin_errors.is_some() {
+                    resp.on_hover_text(self.skin_errors.join("\n"));
+                }
+            }
+        });
     }
 
     fn header(&mut self, ui: &mut egui::Ui, style: &FrameStyle, span: egui::Rangef) -> Option<TabAction> {
@@ -267,6 +315,41 @@ impl Gallery {
 /// The gallery's skins folder is `~/.config/patina-gallery/skins`.
 const GALLERY: &str = "patina-gallery";
 
+/// A message for the status bar.
+struct Status {
+    level: Level,
+    text: String,
+}
+
+#[allow(dead_code)] // The gallery has nothing to warn about.
+enum Level {
+    Error,
+    Warn,
+    Info,
+}
+
+impl Status {
+    fn error(text: impl Into<String>) -> Self {
+        Status { level: Level::Error, text: text.into() }
+    }
+
+    fn info(text: impl Into<String>) -> Self {
+        Status { level: Level::Info, text: text.into() }
+    }
+}
+
+/// What Copy built-in skins did, for the status bar.
+fn export_summary(copied: &[String], skipped: &[String]) -> String {
+    let mut parts = Vec::new();
+    if !copied.is_empty() {
+        parts.push(format!("Copied {}", copied.join(", ")));
+    }
+    if !skipped.is_empty() {
+        parts.push(format!("kept your existing {}", skipped.join(", ")));
+    }
+    parts.join("; ")
+}
+
 /// Patina's built-in skins and the gallery's own folder.
 fn load_skins() -> (Vec<Skin>, Vec<String>) {
     skin::load_all(skin::BUILT_IN, &skin::app_dir(GALLERY).into_iter().collect::<Vec<_>>())
@@ -291,9 +374,17 @@ impl eframe::App for Gallery {
             self.tab_action(action);
         }
 
-        // The panels holding the window's bottom corners round them.
+        // The status bar spans the window, so it comes before the sidebar, and holds both bottom
+        // corners.
+        egui::Panel::bottom("status")
+            .frame(
+                egui::Frame::side_top_panel(ui.style())
+                    .inner_margin(egui::Margin::symmetric(10, 4))
+                    .corner_radius(egui::CornerRadius { sw: radius, se: radius, ..Default::default() }),
+            )
+            .show(ui, |ui| self.status_bar(ui));
         egui::Panel::left("sidebar")
-            .frame(egui::Frame::side_top_panel(ui.style()).corner_radius(egui::CornerRadius { sw: radius, ..Default::default() }))
+            .frame(egui::Frame::side_top_panel(ui.style()))
             .default_size(240.0)
             .show(ui, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -305,7 +396,7 @@ impl eframe::App for Gallery {
             });
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::central_panel(ui.style()).corner_radius(egui::CornerRadius { se: radius, ..Default::default() }))
+            .frame(egui::Frame::central_panel(ui.style()))
             .show(ui, |ui| self.widgets(ui));
 
         if self.custom_frame {

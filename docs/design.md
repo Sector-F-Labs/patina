@@ -63,8 +63,14 @@ Implemented by `patina::frame`.
     - Calendar: Today and the Day/Week/Month switch.
 
     A consumption app with no output, like UnAmp, a music player, leaves the right side empty.
-  - **Elsewhere:** settings, status and secondary information go in the menus, a sidebar or a
-    status bar, not the title bar. Photograph's GPU status sits in a status bar at the bottom.
+  - **Elsewhere:** settings, status and secondary information go in the menus, a sidebar or the
+    status bar, not the title bar. Photograph's GPU status sits in its status bar.
+- **Status bar:** every app has one along the bottom, holding both bottom corners
+  ([ADR-0016](adr/0016-a-status-bar-for-messages.md)).
+  - **Left:** the version (`v0.1.0`, no app name: the title bar has it), small and weak.
+  - **Next to it:** the latest message, red for errors, yellow for warnings, the weak text colour
+    otherwise. Menus never report; what an action did goes here.
+  - **Right:** the app's own standing information, such as Photograph's GPU, or nothing.
   - The title is centred on the window, not on the gap between the controls, and gets an
     ellipsis when there's no room.
   - When a skin colours the bar, the bar's own menus and buttons are drawn in its title colour.
@@ -108,6 +114,10 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
   picks one. Photograph starts in Dark Orange, Calendar in Calendar and Notebook in Notebook.
   This is optional and not one of the rules: UnAmp has none and starts in Default. Whatever the
   app starts in, it offers every skin.
+- **The skin menu** is the same in every app
+  ([ADR-0017](adr/0017-the-skin-menu-holds-only-controls.md)): the skins (yours as `Name — Author`,
+  path on hover); Follow desktop, Light, Dark; then Reload skins, Copy built-in skins to folder and
+  Open skins folder. Sentence case, as wide as its widest entry, and no messages in it.
 - **Within the rules:** a skin copied into any app's folder brings its shared look with it. The app's
   own section waits until that app reads the file. This is how an app can look completely
   different from its siblings while sharing everything else: unity in the structure, variety in

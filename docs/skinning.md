@@ -29,7 +29,7 @@ A skin with the same `name` as one listed before it **replaces** it. That's how 
 built-in: copy it into your folder (apps offer "Copy built-in skins to folder", which never
 overwrites) and edit your copy. Delete the copy to go back to the built-in.
 
-Problems are shown in the app's skin menu:
+Problems are shown in the app's status bar, with the details on hover:
 
 - A bad value, such as `text = "green"`, is an error, and that skin is skipped.
 - An unknown key is listed, but the skin still loads. A misspelt `bakground` gets caught this way
