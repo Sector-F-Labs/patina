@@ -10,9 +10,13 @@
 //! - [`tree`]: a lazily loaded sidebar folder tree.
 //! - [`ime`]: stops the input method keeping an idle window repainting.
 //! - [`open`]: opens files and folders in the desktop's apps, not the browser.
+//! - [`markdown`] (feature `markdown`): markdown shown and edited as Notebook
+//!   does, read-only for documentation; source files highlighted.
 
 pub mod appearance;
 pub mod frame;
+#[cfg(feature = "markdown")]
+pub mod markdown;
 pub mod ime;
 pub mod open;
 pub mod skin;

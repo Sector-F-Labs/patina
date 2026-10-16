@@ -49,6 +49,11 @@ Patina re-exports `egui`, and an app has to use the same egui version.
   never block the UI.
 - **`ime`**: `drop_repeated_preedits`, for `App::raw_input_hook`. Without it, a focused text field
   on GNOME's Wayland keeps the window repainting at full speed.
+- **`markdown`** (cargo feature `markdown`): markdown shown as Notebook shows it, with no syntax
+  on screen: an `Editor` that edits in place or, read-only, only shows, selects and hands clicked
+  links to the app; tables, highlighted code and images; and `embeds::code_file` for a whole
+  source file. Call `markdown::install` once for its fonts and image loaders. See
+  [ADR-0015](docs/adr/0015-markdown-from-notebook.md).
 - **`open`**: `open::path` opens a file or folder in the desktop's app for it (`xdg-open` on
   Linux), so "Open skins folder" lands in the file manager. egui's `open_url` would send a
   `file://` URL to the web browser.

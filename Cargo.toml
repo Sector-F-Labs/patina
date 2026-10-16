@@ -11,8 +11,17 @@ categories = ["gui"]
 [lib]
 name = "patina"
 
+[features]
+default = []
+# Markdown as Notebook shows it (patina::markdown): the parser, syntax
+# highlighting, image loading and Ubuntu's variable fonts.
+markdown = ["dep:pulldown-cmark", "dep:egui_extras", "dep:image"]
+
 [dependencies]
 egui = "0.35"
+pulldown-cmark = { version = "0.13", default-features = false, optional = true }
+egui_extras = { version = "0.35", features = ["syntect", "file", "image", "gif", "webp"], optional = true }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"], optional = true }
 dirs = "7"
 serde = { version = "1", features = ["derive"] }
 serde_ignored = "0.1"

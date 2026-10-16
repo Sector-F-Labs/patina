@@ -56,6 +56,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0012](0012-tab-strip-without-new-tabs.md) | TabStrip can leave out new tabs and name what a tab is | Proposed |
 | [0013](0013-alt-and-a-number-shows-that-tab.md) | Alt and a number shows that tab | Proposed |
 | [0014](0014-tabs-that-cant-close.md) | TabStrip can show tabs that can't be closed | Proposed |
+| [0015](0015-markdown-from-notebook.md) | Notebook's markdown display moves into Patina, behind a feature | Accepted |
 
 ## Decision Relationship
 
