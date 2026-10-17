@@ -90,12 +90,15 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     label: TabLabel,
     menu: Option<&'a mut TabMenu<'a>>,
     own_menu: Option<&'a mut OwnMenu<'a>>,
+    own_tooltip: Option<&'a mut OwnTooltip<'a>>,
 }
 
 /// Adds items to tab `usize`'s menu (see [`TabStrip::tab_menu`]).
 pub type TabMenu<'a> = dyn FnMut(&mut egui::Ui, usize) + 'a;
 /// Opens tab `usize`'s menu at the pointer (see [`TabStrip::own_menu`]).
 pub type OwnMenu<'a> = dyn FnMut(usize, egui::Pos2) + 'a;
+/// Shows tab `usize`'s title beside its `Rect` (see [`TabStrip::own_tooltip`]).
+pub type OwnTooltip<'a> = dyn FnMut(usize, Rect) + 'a;
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     pub fn new(titles: &'a [T], shown: usize, style: &FrameStyle) -> Self {
@@ -113,6 +116,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             label: TabLabel::Title,
             menu: None,
             own_menu: None,
+            own_tooltip: None,
         }
     }
 
@@ -180,6 +184,14 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         self
     }
 
+    /// The app shows a hovered tab's title itself, as a bar too small to
+    /// hold a tooltip does: called each frame a tab is hovered, with the tab
+    /// and its rectangle, and the strip shows no tooltip of its own.
+    pub fn own_tooltip(mut self, show: &'a mut OwnTooltip<'a>) -> Self {
+        self.own_tooltip = Some(show);
+        self
+    }
+
     /// What a tab is, for the menu and the close button: "Close Tab" by
     /// default, "Close Window" with `noun("Window")`.
     pub fn noun(mut self, noun: &'a str) -> Self {
@@ -215,6 +227,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     pub fn show(mut self, ui: &mut egui::Ui) -> Option<TabAction> {
         let mut menu = self.menu.take();
         let mut own_menu = self.own_menu.take();
+        let mut own_tooltip = self.own_tooltip.take();
         let global = ui.ctx().global_style();
         let shown = if self.bar == global.visuals.panel_fill { global.visuals.extreme_bg_color } else { global.visuals.panel_fill };
         // The menus' text colour, and the panel's for the shown tab.
@@ -234,7 +247,16 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             let (mark, titled) = self.content(i, title);
             let text = if titled { title } else { "" };
             let crossed = self.closable && !icons_only;
-            let response = tab(ui, id, width, self.span, mark, text, fill, ink, crossed).on_hover_text(title);
+            let response = tab(ui, id, width, self.span, mark, text, fill, ink, crossed);
+            let response = match own_tooltip.as_mut() {
+                Some(show) => {
+                    if response.hovered() {
+                        show(i, response.rect);
+                    }
+                    response
+                }
+                None => response.on_hover_text(title),
+            };
             // Hovered, a tab has a close button, after its own registration so it wins.
             if crossed && ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
                 action = Some(TabAction::Close(i));
@@ -518,6 +540,25 @@ mod tests {
         assert_eq!(asked.get(), Some((0, tab.center())), "the tab and where it was clicked");
         frame(vec![]);
         assert!(!egui::Popup::is_any_open(&ctx), "and no menu of the strip's own");
+    }
+
+    #[test]
+    fn an_app_can_show_a_hovered_tabs_title_itself() {
+        let ctx = egui::Context::default();
+        let hovered = std::cell::Cell::new(None);
+        let frame = |events| {
+            let screen = Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
+            let input = RawInput { screen_rect: Some(screen), events, ..Default::default() };
+            let _ = ctx.run_ui(input, |ui| {
+                let style = FrameStyle::from_visuals(ui.visuals());
+                let mut show = |i: usize, rect: Rect| hovered.set(Some((i, rect)));
+                TabStrip::new(&TITLES, 1, &style).own_tooltip(&mut show).show(ui);
+            });
+        };
+        frame(vec![]);
+        let tab = ctx.read_response(ids(1).0).unwrap().rect;
+        frame(vec![Event::PointerMoved(tab.center())]);
+        assert_eq!(hovered.get(), Some((1, tab)));
     }
 
     #[test]
