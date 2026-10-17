@@ -363,7 +363,11 @@ fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, mark: 
     let whole = lead + if text.is_empty() { 0.0 } else { galley.size().x };
     let left = rect.center().x - whole / 2.0;
     if let Some(mark) = mark {
-        let at = Rect::from_min_size(egui::pos2(left, rect.center().y - ICON / 2.0), egui::Vec2::splat(ICON));
+        // On whole pixels, so the icon's texels land on the screen's: half a
+        // pixel off (a 41 px bar's middle is 20.5) and it's drawn blurred.
+        let corner = egui::pos2(left, rect.center().y - ICON / 2.0);
+        let corner = egui::emath::GuiRounding::round_to_pixels(corner, ui.ctx().pixels_per_point());
+        let at = Rect::from_min_size(corner, egui::Vec2::splat(ICON));
         match mark {
             Mark::Icon(texture) => {
                 let uv = Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
