@@ -42,10 +42,33 @@ pub enum TabAction {
     Close(usize),
 }
 
+/// What a tab shows: its title, its icon, or both (ADR-0018). Without
+/// [`TabStrip::icons`], always the title.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum TabLabel {
+    #[default]
+    Title,
+    Icon,
+    IconAndTitle,
+}
+
 /// The side of a tab's close button.
 const CLOSE: f32 = 18.0;
 /// The width of the `+` tab.
 const PLUS: f32 = 32.0;
+/// The side of a tab's icon, and the space after it.
+const ICON: f32 = 18.0;
+const ICON_GAP: f32 = 6.0;
+/// The width of a tab showing only its icon.
+const ICON_TAB: f32 = 44.0;
+
+/// What's drawn before a tab's title: an icon, or, where there's none, the
+/// title's first letter in its place.
+#[derive(Clone, Copy)]
+enum Mark {
+    Icon(egui::TextureId),
+    Letter(char),
+}
 
 /// The tabs, each named by its title, then `+` for a new one. They share
 /// the space left in the row, up to 200 px each, and span the bar's height
@@ -63,6 +86,8 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     new_tab: bool,
     closable: bool,
     noun: &'a str,
+    icons: Option<&'a [Option<egui::TextureId>]>,
+    label: TabLabel,
 }
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
@@ -77,6 +102,39 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             new_tab: true,
             closable: true,
             noun: "Tab",
+            icons: None,
+            label: TabLabel::Title,
+        }
+    }
+
+    /// Each tab's icon, by index, `None` where it has none (yet): drawn
+    /// before the title, as [`TabStrip::label`] says. A tab without one
+    /// shows its title's first letter in its place, so the tabs line up.
+    pub fn icons(mut self, icons: &'a [Option<egui::TextureId>]) -> Self {
+        self.icons = Some(icons);
+        self
+    }
+
+    /// Whether tabs show their icon, their title, or both; the title alone
+    /// by default, and without [`TabStrip::icons`]. Icon-only tabs are
+    /// narrow, have no cross (a middle click or the menu still closes
+    /// them), and show their title on hover.
+    pub fn label(mut self, label: TabLabel) -> Self {
+        self.label = label;
+        self
+    }
+
+    /// What tab `i` draws before its title, and whether it shows the title.
+    fn content(&self, i: usize, title: &str) -> (Option<Mark>, bool) {
+        let label = if self.icons.is_some() { self.label } else { TabLabel::Title };
+        let mark = || match self.icons.and_then(|icons| icons.get(i).copied().flatten()) {
+            Some(texture) => Mark::Icon(texture),
+            None => Mark::Letter(title.chars().next().map_or('?', |c| c.to_uppercase().next().unwrap_or(c))),
+        };
+        match label {
+            TabLabel::Title => (None, true),
+            TabLabel::Icon => (Some(mark()), false),
+            TabLabel::IconAndTitle => (Some(mark()), true),
         }
     }
 
@@ -139,15 +197,19 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         ui.spacing_mut().item_spacing.x = 0.0;
         let n = self.titles.len().max(1) as f32;
         let plus = if self.new_tab { PLUS } else { 0.0 };
-        let width = ((ui.available_width() - plus) / n).clamp(48.0, 200.0);
+        let icons_only = self.icons.is_some() && self.label == TabLabel::Icon;
+        let width = if icons_only { ICON_TAB } else { ((ui.available_width() - plus) / n).clamp(48.0, 200.0) };
         let close_label = format!("Close {}", self.noun);
         for (i, title) in self.titles.iter().enumerate() {
             let title = title.as_ref();
             let (fill, ink) = if i == self.shown { (Some(shown), global.visuals.strong_text_color()) } else { (None, ink) };
             let (id, close_id) = self.tab_id(i);
-            let response = tab(ui, id, width, self.span, title, fill, ink, self.closable).on_hover_text(title);
+            let (mark, titled) = self.content(i, title);
+            let text = if titled { title } else { "" };
+            let crossed = self.closable && !icons_only;
+            let response = tab(ui, id, width, self.span, mark, text, fill, ink, crossed).on_hover_text(title);
             // Hovered, a tab has a close button, after its own registration so it wins.
-            if self.closable && ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
+            if crossed && ui.rect_contains_pointer(response.rect) && close(ui, close_id, response.rect, ink, &close_label) {
                 action = Some(TabAction::Close(i));
             } else if response.clicked() {
                 action = Some(TabAction::Show(i));
@@ -168,7 +230,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
                 });
             }
         }
-        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, "+", None, ink, false).on_hover_text(self.new_hint).clicked() {
+        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, None, "+", None, ink, false).on_hover_text(self.new_hint).clicked() {
             action = Some(TabAction::New);
         }
         action
@@ -207,10 +269,11 @@ pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction
 }
 
 /// A tab: `width` wide in the row, `span` tall, square whatever the skin's
-/// rounding, filled with `fill`, else when hovered. A closable tab wide
-/// enough for a close button keeps its text clear of one.
+/// rounding, filled with `fill`, else when hovered. Its `mark` and `text`
+/// are centred together. A closable tab wide enough for a close button
+/// keeps its text clear of one.
 #[allow(clippy::too_many_arguments)]
-fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: &str, fill: Option<Color32>, ink: Color32, closable: bool) -> egui::Response {
+fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, mark: Option<Mark>, text: &str, fill: Option<Color32>, ink: Color32, closable: bool) -> egui::Response {
     let (row, _) = ui.allocate_exact_size(egui::vec2(width, ui.spacing().interact_size.y), egui::Sense::hover());
     let rect = Rect::from_x_y_ranges(row.x_range(), span.unwrap_or(row.y_range()));
     let response = ui.interact(rect, id, egui::Sense::click());
@@ -220,9 +283,31 @@ fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, text: 
         painter.rect_filled(rect, 0.0, fill);
     }
     let room = if closable && width > 4.0 * CLOSE { width - 2.0 * CLOSE - 8.0 } else { width - 16.0 };
+    let (lead, room) = match (mark, text.is_empty()) {
+        (None, _) => (0.0, room),
+        (Some(_), true) => (ICON, room),
+        (Some(_), false) => (ICON + ICON_GAP, room - ICON - ICON_GAP),
+    };
     // Coloured here: the bar's override colour would win over the painter's.
-    let galley = egui::WidgetText::from(egui::RichText::new(text).color(ink)).into_galley(ui, Some(egui::TextWrapMode::Truncate), room, egui::TextStyle::Body);
-    painter.galley(rect.center() - galley.size() / 2.0, galley, ink);
+    let galley = egui::WidgetText::from(egui::RichText::new(text).color(ink)).into_galley(ui, Some(egui::TextWrapMode::Truncate), room.max(0.0), egui::TextStyle::Body);
+    let whole = lead + if text.is_empty() { 0.0 } else { galley.size().x };
+    let left = rect.center().x - whole / 2.0;
+    if let Some(mark) = mark {
+        let at = Rect::from_min_size(egui::pos2(left, rect.center().y - ICON / 2.0), egui::Vec2::splat(ICON));
+        match mark {
+            Mark::Icon(texture) => {
+                let uv = Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+                painter.image(texture, at, uv, Color32::WHITE);
+            }
+            Mark::Letter(letter) => {
+                painter.rect_filled(at, 4.0, ui.visuals().widgets.inactive.bg_fill);
+                painter.text(at.center(), egui::Align2::CENTER_CENTER, letter, egui::FontId::proportional(ICON * 0.6), ink);
+            }
+        }
+    }
+    if !text.is_empty() {
+        painter.galley(egui::pos2(left + lead, rect.center().y - galley.size().y / 2.0), galley, ink);
+    }
     response
 }
 
@@ -350,6 +435,58 @@ mod tests {
         // A click still shows it.
         frame(vec![button(tab.center(), true)]);
         assert_eq!(frame(vec![button(tab.center(), false)]), Some(TabAction::Show(0)));
+    }
+
+    /// A frame of two tabs with icons, the first one's not loaded, shown
+    /// as `label`.
+    fn iconic(ctx: &egui::Context, label: TabLabel, events: Vec<Event>) -> Option<TabAction> {
+        let screen = Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
+        let time = TIME.with(|t| {
+            t.set(t.get() + 0.05);
+            t.get()
+        });
+        let input = RawInput { screen_rect: Some(screen), events, time: Some(time), ..Default::default() };
+        let icons = [None, Some(egui::TextureId::Managed(0))];
+        let mut action = None;
+        let _ = ctx.run_ui(input, |ui| {
+            let style = FrameStyle::from_visuals(ui.visuals());
+            action = TabStrip::new(&TITLES, 1, &style).icons(&icons).label(label).new_tab(false).show(ui);
+        });
+        action
+    }
+
+    #[test]
+    fn icon_only_tabs_are_narrow_and_have_no_cross() {
+        let ctx = egui::Context::default();
+        iconic(&ctx, TabLabel::Icon, vec![]);
+        let tab = ctx.read_response(ids(0).0).unwrap().rect;
+        assert_eq!(tab.width(), ICON_TAB);
+        iconic(&ctx, TabLabel::Icon, vec![Event::PointerMoved(tab.center())]);
+        assert!(ctx.read_response(ids(0).1).is_none(), "no cross over the icon");
+        let middle = |pressed| Event::PointerButton { pos: tab.center(), button: PointerButton::Middle, pressed, modifiers: Default::default() };
+        iconic(&ctx, TabLabel::Icon, vec![middle(true)]);
+        assert_eq!(iconic(&ctx, TabLabel::Icon, vec![middle(false)]), Some(TabAction::Close(0)), "a middle click still closes");
+    }
+
+    #[test]
+    fn tabs_with_titles_keep_their_width_and_cross() {
+        let ctx = egui::Context::default();
+        iconic(&ctx, TabLabel::IconAndTitle, vec![]);
+        let tab = ctx.read_response(ids(0).0).unwrap().rect;
+        assert_eq!(tab.width(), 200.0);
+        iconic(&ctx, TabLabel::IconAndTitle, vec![Event::PointerMoved(tab.center())]);
+        assert!(ctx.read_response(ids(0).1).is_some());
+    }
+
+    #[test]
+    fn a_missing_icon_is_the_titles_first_letter() {
+        let strip_icons = [None, Some(egui::TextureId::Managed(3))];
+        let style = FrameStyle::from_visuals(&egui::Visuals::dark());
+        let strip = TabStrip::new(&TITLES, 0, &style).icons(&strip_icons).label(TabLabel::IconAndTitle);
+        assert!(matches!(strip.content(0, "one"), (Some(Mark::Letter('O')), true)));
+        assert!(matches!(strip.content(1, "two"), (Some(Mark::Icon(_)), true)));
+        let titles_only = TabStrip::new(&TITLES, 0, &style).label(TabLabel::Icon);
+        assert!(matches!(titles_only.content(0, "one"), (None, true)), "no icons given: titles");
     }
 
     #[test]
