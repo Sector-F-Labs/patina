@@ -91,6 +91,7 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     menu: Option<&'a mut TabMenu<'a>>,
     own_menu: Option<&'a mut OwnMenu<'a>>,
     own_tooltip: Option<&'a mut OwnTooltip<'a>>,
+    separator: bool,
 }
 
 /// Adds items to tab `usize`'s menu (see [`TabStrip::tab_menu`]).
@@ -117,6 +118,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             menu: None,
             own_menu: None,
             own_tooltip: None,
+            separator: true,
         }
     }
 
@@ -192,6 +194,14 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         self
     }
 
+    /// Whether a line sets the tabs off from what's before them, as from a
+    /// title bar's menus; on by default. Off for tabs that stand alone, as
+    /// a window list of its own does.
+    pub fn separator(mut self, separator: bool) -> Self {
+        self.separator = separator;
+        self
+    }
+
     /// What a tab is, for the menu and the close button: "Close Tab" by
     /// default, "Close Window" with `noun("Window")`.
     pub fn noun(mut self, noun: &'a str) -> Self {
@@ -233,7 +243,9 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         // The menus' text colour, and the panel's for the shown tab.
         let ink = ui.visuals().widgets.inactive.text_color();
         let mut action = None;
-        ui.separator();
+        if self.separator {
+            ui.separator();
+        }
         ui.spacing_mut().item_spacing.x = 0.0;
         let n = self.titles.len().max(1) as f32;
         let plus = if self.new_tab { PLUS } else { 0.0 };
