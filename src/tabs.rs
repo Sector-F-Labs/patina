@@ -88,6 +88,7 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     noun: &'a str,
     icons: Option<&'a [Option<egui::TextureId>]>,
     label: TabLabel,
+    menu: Option<&'a mut dyn FnMut(&mut egui::Ui, usize)>,
 }
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
@@ -104,6 +105,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             noun: "Tab",
             icons: None,
             label: TabLabel::Title,
+            menu: None,
         }
     }
 
@@ -155,6 +157,14 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         self
     }
 
+    /// More items for each tab's right-click menu, before Close: called
+    /// with the menu and the tab's index, as a window list's "New Window"
+    /// for that tab's app. Close the menu with `ui.close()` after acting.
+    pub fn tab_menu(mut self, menu: &'a mut dyn FnMut(&mut egui::Ui, usize)) -> Self {
+        self.menu = Some(menu);
+        self
+    }
+
     /// What a tab is, for the menu and the close button: "Close Tab" by
     /// default, "Close Window" with `noun("Window")`.
     pub fn noun(mut self, noun: &'a str) -> Self {
@@ -187,7 +197,8 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         (self.id.with(("tab", i)), self.id.with(("close", i)))
     }
 
-    pub fn show(self, ui: &mut egui::Ui) -> Option<TabAction> {
+    pub fn show(mut self, ui: &mut egui::Ui) -> Option<TabAction> {
+        let mut menu = self.menu.take();
         let global = ui.ctx().global_style();
         let shown = if self.bar == global.visuals.panel_fill { global.visuals.extreme_bg_color } else { global.visuals.panel_fill };
         // The menus' text colour, and the panel's for the shown tab.
@@ -217,11 +228,14 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             if self.closable && response.middle_clicked() {
                 action = Some(TabAction::Close(i));
             }
-            if self.new_tab || self.closable {
+            if self.new_tab || self.closable || menu.is_some() {
                 response.context_menu(|ui| {
                     if self.new_tab && ui.button(format!("New {}", self.noun)).clicked() {
                         action = Some(TabAction::New);
                         ui.close();
+                    }
+                    if let Some(menu) = menu.as_mut() {
+                        menu(ui, i);
                     }
                     if self.closable && ui.button(&close_label).clicked() {
                         action = Some(TabAction::Close(i));
@@ -414,6 +428,46 @@ mod tests {
         bar_with(&ctx, vec![button(at, true)], false, true);
         assert_eq!(bar_with(&ctx, vec![button(at, false)], false, true), None);
         assert!(ctx.read_response(Id::new("patina_tabs").with("new")).is_none());
+    }
+
+    #[test]
+    fn a_tabs_menu_has_the_apps_own_items_for_that_tab() {
+        let ctx = egui::Context::default();
+        let shown = std::cell::Cell::new(None);
+        let chosen = std::cell::Cell::new(None);
+        let frame = |events| {
+            let screen = Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
+            let time = TIME.with(|t| {
+                t.set(t.get() + 0.05);
+                t.get()
+            });
+            let input = RawInput { screen_rect: Some(screen), events, time: Some(time), ..Default::default() };
+            let _ = ctx.run_ui(input, |ui| {
+                let style = FrameStyle::from_visuals(ui.visuals());
+                let mut menu = |ui: &mut egui::Ui, i: usize| {
+                    let item = ui.button("New Window");
+                    shown.set(Some((i, item.rect)));
+                    if item.clicked() {
+                        chosen.set(Some(i));
+                        ui.close();
+                    }
+                };
+                TabStrip::new(&TITLES, 1, &style).new_tab(false).closable(false).tab_menu(&mut menu).show(ui);
+            });
+        };
+        frame(vec![]);
+        let tab = ctx.read_response(ids(0).0).unwrap().rect;
+        let right = |pressed| Event::PointerButton { pos: tab.center(), button: PointerButton::Secondary, pressed, modifiers: Default::default() };
+        frame(vec![Event::PointerMoved(tab.center())]);
+        frame(vec![right(true)]);
+        frame(vec![right(false)]);
+        frame(vec![]);
+        let (i, item) = shown.get().expect("a right click opens the tab's menu, with the app's item");
+        assert_eq!(i, 0, "for the tab clicked");
+        frame(vec![Event::PointerMoved(item.center())]);
+        frame(vec![button(item.center(), true)]);
+        frame(vec![button(item.center(), false)]);
+        assert_eq!(chosen.get(), Some(0));
     }
 
     #[test]
