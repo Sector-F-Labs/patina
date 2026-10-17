@@ -88,8 +88,14 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     noun: &'a str,
     icons: Option<&'a [Option<egui::TextureId>]>,
     label: TabLabel,
-    menu: Option<&'a mut dyn FnMut(&mut egui::Ui, usize)>,
+    menu: Option<&'a mut TabMenu<'a>>,
+    own_menu: Option<&'a mut OwnMenu<'a>>,
 }
+
+/// Adds items to tab `usize`'s menu (see [`TabStrip::tab_menu`]).
+pub type TabMenu<'a> = dyn FnMut(&mut egui::Ui, usize) + 'a;
+/// Opens tab `usize`'s menu at the pointer (see [`TabStrip::own_menu`]).
+pub type OwnMenu<'a> = dyn FnMut(usize, egui::Pos2) + 'a;
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     pub fn new(titles: &'a [T], shown: usize, style: &FrameStyle) -> Self {
@@ -106,6 +112,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             icons: None,
             label: TabLabel::Title,
             menu: None,
+            own_menu: None,
         }
     }
 
@@ -160,8 +167,16 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     /// More items for each tab's right-click menu, before Close: called
     /// with the menu and the tab's index, as a window list's "New Window"
     /// for that tab's app. Close the menu with `ui.close()` after acting.
-    pub fn tab_menu(mut self, menu: &'a mut dyn FnMut(&mut egui::Ui, usize)) -> Self {
+    pub fn tab_menu(mut self, menu: &'a mut TabMenu<'a>) -> Self {
         self.menu = Some(menu);
+        self
+    }
+
+    /// The app opens each tab's menu itself, as a bar too small to hold
+    /// one does (in a menu of its own on the screen): a right click calls
+    /// this with the tab and the pointer, and the strip draws no menu.
+    pub fn own_menu(mut self, open: &'a mut OwnMenu<'a>) -> Self {
+        self.own_menu = Some(open);
         self
     }
 
@@ -199,6 +214,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
 
     pub fn show(mut self, ui: &mut egui::Ui) -> Option<TabAction> {
         let mut menu = self.menu.take();
+        let mut own_menu = self.own_menu.take();
         let global = ui.ctx().global_style();
         let shown = if self.bar == global.visuals.panel_fill { global.visuals.extreme_bg_color } else { global.visuals.panel_fill };
         // The menus' text colour, and the panel's for the shown tab.
@@ -228,7 +244,13 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             if self.closable && response.middle_clicked() {
                 action = Some(TabAction::Close(i));
             }
-            if self.new_tab || self.closable || menu.is_some() {
+            if let Some(open) = own_menu.as_mut() {
+                if response.secondary_clicked()
+                    && let Some(at) = response.interact_pointer_pos()
+                {
+                    open(i, at);
+                }
+            } else if self.new_tab || self.closable || menu.is_some() {
                 response.context_menu(|ui| {
                     if self.new_tab && ui.button(format!("New {}", self.noun)).clicked() {
                         action = Some(TabAction::New);
@@ -468,6 +490,34 @@ mod tests {
         frame(vec![button(item.center(), true)]);
         frame(vec![button(item.center(), false)]);
         assert_eq!(chosen.get(), Some(0));
+    }
+
+    #[test]
+    fn an_app_can_open_a_tabs_menu_itself() {
+        let ctx = egui::Context::default();
+        let asked = std::cell::Cell::new(None);
+        let frame = |events| {
+            let screen = Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
+            let time = TIME.with(|t| {
+                t.set(t.get() + 0.05);
+                t.get()
+            });
+            let input = RawInput { screen_rect: Some(screen), events, time: Some(time), ..Default::default() };
+            let _ = ctx.run_ui(input, |ui| {
+                let style = FrameStyle::from_visuals(ui.visuals());
+                let mut open = |i: usize, at: egui::Pos2| asked.set(Some((i, at)));
+                TabStrip::new(&TITLES, 1, &style).new_tab(false).own_menu(&mut open).show(ui);
+            });
+        };
+        frame(vec![]);
+        let tab = ctx.read_response(ids(0).0).unwrap().rect;
+        let right = |pressed| Event::PointerButton { pos: tab.center(), button: PointerButton::Secondary, pressed, modifiers: Default::default() };
+        frame(vec![Event::PointerMoved(tab.center())]);
+        frame(vec![right(true)]);
+        frame(vec![right(false)]);
+        assert_eq!(asked.get(), Some((0, tab.center())), "the tab and where it was clicked");
+        frame(vec![]);
+        assert!(!egui::Popup::is_any_open(&ctx), "and no menu of the strip's own");
     }
 
     #[test]
