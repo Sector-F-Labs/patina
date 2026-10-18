@@ -60,6 +60,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0016](0016-a-status-bar-for-messages.md) | A status bar along the bottom: the version, then colour-coded messages, then the app's own status | Accepted |
 | [0017](0017-the-skin-menu-holds-only-controls.md) | The skin menu holds only controls, in the same order in every app | Accepted |
 | [0018](0018-tabs-with-icons.md) | TabStrip can show an icon on each tab, with or without its title | Proposed |
+| [0019](0019-kinetic-scrolling-on-a-touchpad.md) | A touchpad flick keeps scrolling after the fingers lift, through `patina::kinetic` | Proposed |
 
 ## Decision Relationship
 
@@ -85,6 +86,7 @@ flowchart TD
     C --> O[0016: Status bar for messages]
     K --> P[0017: Skin menu holds only controls]
     O --> P
+    C --> R[0019: Kinetic scrolling on a touchpad]
 ```
 
 ## Revisit Triggers
@@ -97,4 +99,6 @@ flowchart TD
   skin. See [ADR-0004](0004-skins-in-patina.md).
 - winit exposes Wayland's `wm_capabilities`, or a compositor in the window-button table changes
   what it supports. See [ADR-0008](0008-window-buttons-follow-the-compositor.md).
+- egui glides after a touchpad lift itself, or winit exposes libinput's hold gesture. See
+  [ADR-0019](0019-kinetic-scrolling-on-a-touchpad.md).
 - A component only one app uses keeps growing app-specific options. Move it back into the app.

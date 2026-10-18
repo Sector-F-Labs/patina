@@ -12,6 +12,7 @@ use std::path::PathBuf;
 
 use eframe::egui;
 use patina::ime;
+use patina::kinetic;
 use patina::frame::{self, FrameStyle, TitleBar};
 use patina::skin::{self, Skin};
 use patina::tabs::{self, TabAction, TabStrip};
@@ -412,5 +413,6 @@ impl eframe::App for Gallery {
     fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         frame::release_grab(ctx, raw_input);
         ime::drop_repeated_preedits(ctx, raw_input);
+        kinetic::glide(ctx, raw_input);
     }
 }
