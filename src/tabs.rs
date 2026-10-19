@@ -34,11 +34,13 @@ use crate::frame::FrameStyle;
 /// What the user did to the tabs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TabAction {
-    /// Open a new tab: `+`, a tab's menu, or Ctrl+Shift+T.
+    /// Open a new tab: `+`, a tab's menu, or Ctrl+T (Ctrl+Shift+T in a
+    /// terminal, [`terminal_keys`]).
     New,
     /// Show this tab: a click, Ctrl+PageUp/PageDown, or Alt+1 to Alt+9.
     Show(usize),
-    /// Close this tab: its cross, a middle click, or its menu.
+    /// Close this tab: its cross, a middle click, its menu, or Ctrl+W for
+    /// the shown one (Ctrl+Shift+W in a terminal).
     Close(usize),
 }
 
@@ -109,7 +111,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             bar: style.title_bar,
             span: None,
             id: Id::new("patina_tabs"),
-            new_hint: "New Tab (Ctrl+Shift+T)",
+            new_hint: "New Tab (Ctrl+T)",
             new_tab: true,
             closable: true,
             noun: "Tab",
@@ -307,21 +309,39 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     }
 }
 
-/// Ctrl+Shift+T for a new tab, Ctrl+PageUp/PageDown for the tab before or
-/// after `shown`, of `count`, wrapping round, and Alt+1 to Alt+9 for that
-/// tab. The keys are consumed, so call this before the widgets that would
-/// otherwise get them. An Alt+digit is taken, with the digit egui sends after
-/// it as text, only when that tab exists, so past the last tab it still
-/// reaches the app (readline's numeric argument, in a terminal).
+/// Ctrl+T for a new tab, Ctrl+W to close the shown one, Ctrl+PageUp/PageDown
+/// for the tab before or after `shown`, of `count`, wrapping round, and
+/// Alt+1 to Alt+9 for that tab (ADR-0020). Ctrl+T and Ctrl+W are taken only
+/// without Shift, which a browser keeps for reopening a tab. The keys are
+/// consumed, so call this before the widgets that would otherwise get them.
+/// An Alt+digit is taken, with the digit egui sends after it as text, only
+/// when that tab exists, so past the last tab it still reaches the app.
+///
+/// On the Patina desktop, Super+T and Super+W arrive as these keys.
 pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction> {
+    keys_with(ctx, count, shown, egui::Modifiers::CTRL)
+}
+
+/// [`keys`] for a terminal, whose Ctrl+T and Ctrl+W belong to the shell:
+/// Ctrl+Shift+T and Ctrl+Shift+W instead. Alt+digit past the last tab still
+/// reaches the shell (readline's numeric argument).
+pub fn terminal_keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction> {
+    keys_with(ctx, count, shown, egui::Modifiers::CTRL | egui::Modifiers::SHIFT)
+}
+
+/// The tab keys, with `new_close` held for the new and close keys.
+fn keys_with(ctx: &egui::Context, count: usize, shown: usize, new_close: egui::Modifiers) -> Option<TabAction> {
     const DIGITS: [egui::Key; 9] = {
         use egui::Key::*;
         [Num1, Num2, Num3, Num4, Num5, Num6, Num7, Num8, Num9]
     };
     ctx.input_mut(|i| {
         let mut action = None;
-        if i.consume_key(egui::Modifiers::CTRL | egui::Modifiers::SHIFT, egui::Key::T) {
+        if consume_exact(i, new_close, egui::Key::T) {
             action = Some(TabAction::New);
+        }
+        if count > 0 && consume_exact(i, new_close, egui::Key::W) {
+            action = Some(TabAction::Close(shown.min(count - 1)));
         }
         if count > 0 && i.consume_key(egui::Modifiers::CTRL, egui::Key::PageUp) {
             action = Some(TabAction::Show((shown + count - 1) % count));
@@ -336,6 +356,16 @@ pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction
         }
         action
     })
+}
+
+/// Like `consume_key`, but Shift and Alt must match too, so Ctrl+T isn't
+/// taken for Ctrl+Shift+T.
+fn consume_exact(i: &mut egui::InputState, modifiers: egui::Modifiers, key: egui::Key) -> bool {
+    let before = i.events.len();
+    i.events.retain(|e| {
+        !matches!(e, egui::Event::Key { key: k, pressed: true, modifiers: m, .. } if *k == key && m.matches_exact(modifiers))
+    });
+    i.events.len() != before
 }
 
 /// A tab: `width` wide in the row, `span` tall, square whatever the skin's
@@ -662,8 +692,29 @@ mod tests {
         };
         assert_eq!(cycle(key(egui::Key::PageUp, egui::Modifiers::CTRL), 0), Some(TabAction::Show(2)));
         assert_eq!(cycle(key(egui::Key::PageDown, egui::Modifiers::CTRL), 2), Some(TabAction::Show(0)));
-        assert_eq!(cycle(key(egui::Key::T, egui::Modifiers::CTRL | egui::Modifiers::SHIFT), 0), Some(TabAction::New));
-        assert_eq!(cycle(key(egui::Key::T, egui::Modifiers::CTRL), 0), None);
+    }
+
+    #[test]
+    fn ctrl_t_and_w_in_an_app_with_shift_in_a_terminal() {
+        let ctx = egui::Context::default();
+        let ctrl = egui::Modifiers::CTRL;
+        let ctrl_shift = egui::Modifiers::CTRL | egui::Modifiers::SHIFT;
+        let press = |terminal: bool, key, modifiers| {
+            let mut action = None;
+            let events = vec![Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }];
+            let _ = ctx.run_ui(RawInput { events, ..Default::default() }, |ui| {
+                action = if terminal { terminal_keys(ui.ctx(), 3, 1) } else { keys(ui.ctx(), 3, 1) };
+            });
+            action
+        };
+        assert_eq!(press(false, egui::Key::T, ctrl), Some(TabAction::New));
+        assert_eq!(press(false, egui::Key::W, ctrl), Some(TabAction::Close(1)));
+        assert_eq!(press(false, egui::Key::T, ctrl_shift), None, "a browser's reopen");
+        assert_eq!(press(false, egui::Key::W, ctrl_shift), None);
+        assert_eq!(press(true, egui::Key::T, ctrl_shift), Some(TabAction::New));
+        assert_eq!(press(true, egui::Key::W, ctrl_shift), Some(TabAction::Close(1)));
+        assert_eq!(press(true, egui::Key::T, ctrl), None, "the shell's");
+        assert_eq!(press(true, egui::Key::W, ctrl), None);
     }
 
     #[test]

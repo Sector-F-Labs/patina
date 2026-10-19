@@ -61,6 +61,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0017](0017-the-skin-menu-holds-only-controls.md) | The skin menu holds only controls, in the same order in every app | Accepted |
 | [0018](0018-tabs-with-icons.md) | TabStrip can show an icon on each tab, with or without its title | Proposed |
 | [0019](0019-kinetic-scrolling-on-a-touchpad.md) | A touchpad flick keeps scrolling after the fingers lift, through `patina::kinetic` | Proposed |
+| [0020](0020-ctrl-t-and-w-and-a-terminals-keys.md) | Tabs take Ctrl+T and Ctrl+W; a terminal takes them with Shift | Proposed |
 
 ## Decision Relationship
 
