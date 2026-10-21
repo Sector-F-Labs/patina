@@ -187,11 +187,20 @@ pub struct TitleBar<'a> {
     style: &'a FrameStyle,
     custom: bool,
     menu_bar: bool,
+    minimise: bool,
 }
 
 impl<'a> TitleBar<'a> {
     pub fn new(title: &'a str, style: &'a FrameStyle) -> Self {
-        Self { title, style, custom: true, menu_bar: false }
+        Self { title, style, custom: true, menu_bar: false, minimise: true }
+    }
+
+    /// Whether the window buttons include minimise (the default, where the
+    /// desktop can). Off for a desktop that has nowhere to minimise to, as
+    /// in the frames the Patina compositor draws for X11 windows.
+    pub fn minimise(mut self, minimise: bool) -> Self {
+        self.minimise = minimise;
+        self
     }
 
     /// Whether the app draws its own frame (the default). Off, the title and
@@ -211,7 +220,7 @@ impl<'a> TitleBar<'a> {
     /// Draws the bar. `left` is laid out left to right from the left edge;
     /// `right` right to left, ending at the window buttons.
     pub fn show(self, ui: &mut egui::Ui, left: impl FnOnce(&mut egui::Ui), right: impl FnOnce(&mut egui::Ui)) {
-        let Self { title, style, custom, menu_bar } = self;
+        let Self { title, style, custom, menu_bar, minimise } = self;
         let ctx = ui.ctx().clone();
         let bar = ui.max_rect();
         if custom {
@@ -250,7 +259,9 @@ impl<'a> TitleBar<'a> {
                 if button(&mut buttons, &style.controls, kind).on_hover_text(tip).clicked() {
                     ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
                 }
-                if button(&mut buttons, &style.controls, Button::Minimize).on_hover_text("Minimise").clicked() {
+                if minimise
+                    && button(&mut buttons, &style.controls, Button::Minimize).on_hover_text("Minimise").clicked()
+                {
                     ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
                 }
             }
