@@ -44,7 +44,8 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`tabs`**: tabs in the title bar after the menus, in place of the window title: each square and the
   bar's full height, the shown one joined to the panel below, with a close cross on hover and `+` (each optional: `closable`, `new_tab`), and
   Ctrl+T, Ctrl+W (Ctrl+Shift+T and W in a terminal, `terminal_keys`), Ctrl+PageUp/PageDown and Alt+1 to Alt+9. The app owns the tabs and applies the
-  `TabAction`s.
+  `TabAction`s. Tabs can be dragged into another order (`movable`), and some can be launchers,
+  faded icons for something not open (`launchers`).
 - **`tree`**: a sidebar folder tree that lists folders on worker threads, so slow network shares
   never block the UI.
 - **`ime`**: `drop_repeated_preedits`, for `App::raw_input_hook`. Without it, a focused text field

@@ -93,6 +93,8 @@ pub struct TabStrip<'a, T: AsRef<str>> {
     menu: Option<&'a mut TabMenu<'a>>,
     own_menu: Option<&'a mut OwnMenu<'a>>,
     own_tooltip: Option<&'a mut OwnTooltip<'a>>,
+    moved: Option<&'a mut Moved<'a>>,
+    launchers: &'a [bool],
     separator: bool,
 }
 
@@ -102,6 +104,8 @@ pub type TabMenu<'a> = dyn FnMut(&mut egui::Ui, usize) + 'a;
 pub type OwnMenu<'a> = dyn FnMut(usize, egui::Pos2) + 'a;
 /// Shows tab `usize`'s title beside its `Rect` (see [`TabStrip::own_tooltip`]).
 pub type OwnTooltip<'a> = dyn FnMut(usize, Rect) + 'a;
+/// Moves tab `from` to `to` (see [`TabStrip::movable`]).
+pub type Moved<'a> = dyn FnMut(usize, usize) + 'a;
 
 impl<'a, T: AsRef<str>> TabStrip<'a, T> {
     pub fn new(titles: &'a [T], shown: usize, style: &FrameStyle) -> Self {
@@ -120,6 +124,8 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             menu: None,
             own_menu: None,
             own_tooltip: None,
+            moved: None,
+            launchers: &[],
             separator: true,
         }
     }
@@ -141,9 +147,39 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         self
     }
 
+    /// Tabs that start something rather than show it, by index (`false`
+    /// past the end), as a desktop bar's pinned apps that aren't open
+    /// (ADR-0021): only their icon whatever the label, faded, with no
+    /// cross, and never filled as the shown tab. A click on one is still a
+    /// `TabAction::Show`, for the app to start what it stands for.
+    pub fn launchers(mut self, launchers: &'a [bool]) -> Self {
+        self.launchers = launchers;
+        self
+    }
+
+    fn launcher(&self, i: usize) -> bool {
+        self.launchers.get(i).copied().unwrap_or(false)
+    }
+
+    /// The tabs can be dragged along the strip to put them in another
+    /// order (ADR-0021): a line marks where a dragged tab would go, and on
+    /// the drop this is called with the tab and its new index, as
+    /// `Vec::remove` then `Vec::insert` would place it. The app reorders
+    /// its tabs; a drop where the tab already was calls nothing.
+    pub fn movable(mut self, moved: &'a mut Moved<'a>) -> Self {
+        self.moved = Some(moved);
+        self
+    }
+
     /// What tab `i` draws before its title, and whether it shows the title.
     fn content(&self, i: usize, title: &str) -> (Option<Mark>, bool) {
-        let label = if self.icons.is_some() { self.label } else { TabLabel::Title };
+        let label = if self.launcher(i) {
+            TabLabel::Icon
+        } else if self.icons.is_some() {
+            self.label
+        } else {
+            TabLabel::Title
+        };
         let mark = || match self.icons.and_then(|icons| icons.get(i).copied().flatten()) {
             Some(texture) => Mark::Icon(texture),
             None => Mark::Letter(title.chars().next().map_or('?', |c| c.to_uppercase().next().unwrap_or(c))),
@@ -240,6 +276,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         let mut menu = self.menu.take();
         let mut own_menu = self.own_menu.take();
         let mut own_tooltip = self.own_tooltip.take();
+        let mut moved = self.moved.take();
         let global = ui.ctx().global_style();
         let shown = if self.bar == global.visuals.panel_fill { global.visuals.extreme_bg_color } else { global.visuals.panel_fill };
         // The menus' text colour, and the panel's for the shown tab.
@@ -249,19 +286,31 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             ui.separator();
         }
         ui.spacing_mut().item_spacing.x = 0.0;
-        let n = self.titles.len().max(1) as f32;
+        let launchers = (0..self.titles.len()).filter(|&i| self.launcher(i)).count();
+        let n = (self.titles.len() - launchers).max(1) as f32;
         let plus = if self.new_tab { PLUS } else { 0.0 };
         let icons_only = self.icons.is_some() && self.label == TabLabel::Icon;
-        let width = if icons_only { ICON_TAB } else { ((ui.available_width() - plus) / n).clamp(48.0, 200.0) };
+        let width = if icons_only { ICON_TAB } else { ((ui.available_width() - plus - launchers as f32 * ICON_TAB) / n).clamp(48.0, 200.0) };
         let close_label = format!("Close {}", self.noun);
+        let sense = if moved.is_some() { egui::Sense::click_and_drag() } else { egui::Sense::click() };
+        // Each tab's place, and the one being dragged, if it was let go.
+        let mut places = Vec::with_capacity(self.titles.len());
+        let mut dragged = None;
         for (i, title) in self.titles.iter().enumerate() {
             let title = title.as_ref();
-            let (fill, ink) = if i == self.shown { (Some(shown), global.visuals.strong_text_color()) } else { (None, ink) };
+            let launcher = self.launcher(i);
+            let (fill, ink) = if i == self.shown && !launcher { (Some(shown), global.visuals.strong_text_color()) } else { (None, ink) };
             let (id, close_id) = self.tab_id(i);
             let (mark, titled) = self.content(i, title);
             let text = if titled { title } else { "" };
-            let crossed = self.closable && !icons_only;
-            let response = tab(ui, id, width, self.span, mark, text, fill, ink, crossed);
+            let crossed = self.closable && !icons_only && !launcher;
+            let look = Look { mark, text, fill, ink, closable: crossed, faded: launcher };
+            let width = if launcher { ICON_TAB } else { width };
+            let response = tab(ui, id, width, self.span, sense, look);
+            places.push(response.rect);
+            if response.dragged() || response.drag_stopped() {
+                dragged = Some((i, response.drag_stopped()));
+            }
             let response = match own_tooltip.as_mut() {
                 Some(show) => {
                     if response.hovered() {
@@ -302,11 +351,52 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
                 });
             }
         }
-        if self.new_tab && tab(ui, self.id.with("new"), PLUS, self.span, None, "+", None, ink, false).on_hover_text(self.new_hint).clicked() {
-            action = Some(TabAction::New);
+        if let (Some(moved), Some((from, dropped))) = (moved.as_mut(), dragged)
+            && let Some(pointer) = ui.ctx().pointer_latest_pos()
+        {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+            let horizontal = ui.layout().is_horizontal();
+            let along = |p: egui::Pos2| if horizontal { p.x } else { p.y };
+            // The gap the pointer is nearest: before the first tab whose
+            // middle is past it, or after the last.
+            let gap = places.iter().filter(|r| along(r.center()) < along(pointer)).count();
+            let to = if gap > from { gap - 1 } else { gap };
+            if to != from {
+                if dropped {
+                    moved(from, to);
+                } else {
+                    let line = egui::Stroke::new(2.0, global.visuals.strong_text_color());
+                    // Moving, there are tabs: the line is before the next, or after the last.
+                    let (next, last) = (places.get(gap), places[places.len() - 1]);
+                    match (horizontal, next) {
+                        (true, Some(next)) => ui.painter().vline(next.left(), next.y_range(), line),
+                        (true, None) => ui.painter().vline(last.right(), last.y_range(), line),
+                        (false, Some(next)) => ui.painter().hline(next.x_range(), next.top(), line),
+                        (false, None) => ui.painter().hline(last.x_range(), last.bottom(), line),
+                    };
+                }
+            }
+        }
+        if self.new_tab {
+            let look = Look { mark: None, text: "+", fill: None, ink, closable: false, faded: false };
+            if tab(ui, self.id.with("new"), PLUS, self.span, egui::Sense::click(), look).on_hover_text(self.new_hint).clicked() {
+                action = Some(TabAction::New);
+            }
         }
         action
     }
+}
+
+/// What a tab draws: its `mark` and `text`, centred together, in `ink`, on
+/// `fill` (else lit when hovered), clear of a close button if `closable`;
+/// `faded`, a launcher's.
+struct Look<'t> {
+    mark: Option<Mark>,
+    text: &'t str,
+    fill: Option<Color32>,
+    ink: Color32,
+    closable: bool,
+    faded: bool,
 }
 
 /// Ctrl+T for a new tab, Ctrl+W to close the shown one, Ctrl+PageUp/PageDown
@@ -369,14 +459,15 @@ fn consume_exact(i: &mut egui::InputState, modifiers: egui::Modifiers, key: egui
 }
 
 /// A tab: `width` wide in the row, `span` tall, square whatever the skin's
-/// rounding, filled with `fill`, else when hovered. Its `mark` and `text`
-/// are centred together. A closable tab wide enough for a close button
-/// keeps its text clear of one.
-#[allow(clippy::too_many_arguments)]
-fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, mark: Option<Mark>, text: &str, fill: Option<Color32>, ink: Color32, closable: bool) -> egui::Response {
+/// rounding, drawn as `look` says. A closable tab wide enough for a close
+/// button keeps its text clear of one.
+fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, sense: egui::Sense, look: Look) -> egui::Response {
+    let Look { mark, text, fill, ink, closable, faded } = look;
     let (row, _) = ui.allocate_exact_size(egui::vec2(width, ui.spacing().interact_size.y), egui::Sense::hover());
     let rect = Rect::from_x_y_ranges(row.x_range(), span.unwrap_or(row.y_range()));
-    let response = ui.interact(rect, id, egui::Sense::click());
+    let response = ui.interact(rect, id, sense);
+    // A launcher's icon, or letter, is half there.
+    let tint = if faded { Color32::WHITE.gamma_multiply(0.5) } else { Color32::WHITE };
     let painter = ui.painter().with_clip_rect(rect);
     // The pointer, not `hovered`: over the close button the tab isn't hovered, but is still lit.
     if let Some(fill) = fill.or_else(|| ui.rect_contains_pointer(rect).then(|| ui.visuals().widgets.hovered.weak_bg_fill)) {
@@ -401,11 +492,11 @@ fn tab(ui: &mut egui::Ui, id: Id, width: f32, span: Option<egui::Rangef>, mark: 
         match mark {
             Mark::Icon(texture) => {
                 let uv = Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
-                painter.image(texture, at, uv, Color32::WHITE);
+                painter.image(texture, at, uv, tint);
             }
             Mark::Letter(letter) => {
-                painter.rect_filled(at, 4.0, ui.visuals().widgets.inactive.bg_fill);
-                painter.text(at.center(), egui::Align2::CENTER_CENTER, letter, egui::FontId::proportional(ICON * 0.6), ink);
+                painter.rect_filled(at, 4.0, ui.visuals().widgets.inactive.bg_fill.gamma_multiply(tint.a() as f32 / 255.0));
+                painter.text(at.center(), egui::Align2::CENTER_CENTER, letter, egui::FontId::proportional(ICON * 0.6), ink.gamma_multiply(tint.a() as f32 / 255.0));
             }
         }
     }
@@ -678,6 +769,70 @@ mod tests {
         assert!(matches!(strip.content(1, "two"), (Some(Mark::Icon(_)), true)));
         let titles_only = TabStrip::new(&TITLES, 0, &style).label(TabLabel::Icon);
         assert!(matches!(titles_only.content(0, "one"), (None, true)), "no icons given: titles");
+    }
+
+    /// A frame of three tabs, the first a launcher, that can be dragged:
+    /// what was moved where, if a tab was dropped.
+    fn movable(ctx: &egui::Context, events: Vec<Event>) -> Option<(usize, usize)> {
+        let screen = Rect::from_min_size(pos2(0.0, 0.0), egui::vec2(800.0, 600.0));
+        let time = TIME.with(|t| {
+            t.set(t.get() + 0.05);
+            t.get()
+        });
+        let input = RawInput { screen_rect: Some(screen), events, time: Some(time), ..Default::default() };
+        let mut dropped = None;
+        let _ = ctx.run_ui(input, |ui| {
+            ui.horizontal(|ui| {
+                let style = FrameStyle::from_visuals(ui.visuals());
+                let mut moved = |from, to| dropped = Some((from, to));
+                TabStrip::new(&["one", "two", "three"], 0, &style).new_tab(false).launchers(&[true]).movable(&mut moved).show(ui);
+            });
+        });
+        dropped
+    }
+
+    /// Drags from `from` to `to` in steps, and lets go there.
+    fn drag(ctx: &egui::Context, from: egui::Pos2, to: egui::Pos2) -> Option<(usize, usize)> {
+        movable(ctx, vec![Event::PointerMoved(from)]);
+        movable(ctx, vec![button(from, true)]);
+        for step in 1..=4 {
+            movable(ctx, vec![Event::PointerMoved(from.lerp(to, step as f32 / 4.0))]);
+        }
+        movable(ctx, vec![button(to, false)])
+    }
+
+    #[test]
+    fn a_tab_dragged_past_another_moves_there() {
+        let ctx = egui::Context::default();
+        movable(&ctx, vec![]);
+        let rect = |i| ctx.read_response(ids(i).0).unwrap().rect;
+        assert_eq!(drag(&ctx, rect(1).center(), rect(2).right_center() - egui::vec2(4.0, 0.0)), Some((1, 2)));
+        assert_eq!(drag(&ctx, rect(2).center(), rect(0).left_center() + egui::vec2(4.0, 0.0)), Some((2, 0)));
+    }
+
+    #[test]
+    fn a_tab_dropped_where_it_was_stays() {
+        let ctx = egui::Context::default();
+        movable(&ctx, vec![]);
+        let tab = ctx.read_response(ids(1).0).unwrap().rect;
+        assert_eq!(drag(&ctx, tab.center(), tab.center() + egui::vec2(20.0, 0.0)), None);
+        // And a click is still a click.
+        movable(&ctx, vec![button(tab.center(), true)]);
+        assert_eq!(movable(&ctx, vec![button(tab.center(), false)]), None);
+    }
+
+    #[test]
+    fn a_launcher_is_only_its_icon_with_no_cross() {
+        let ctx = egui::Context::default();
+        movable(&ctx, vec![]);
+        let launcher = ctx.read_response(ids(0).0).unwrap().rect;
+        assert_eq!(launcher.width(), ICON_TAB);
+        assert!(ctx.read_response(ids(1).0).unwrap().rect.width() > ICON_TAB, "the others have their titles");
+        movable(&ctx, vec![Event::PointerMoved(launcher.center())]);
+        assert!(ctx.read_response(ids(0).1).is_none());
+        let style = FrameStyle::from_visuals(&egui::Visuals::dark());
+        let strip = TabStrip::new(&TITLES, 0, &style).launchers(&[true]);
+        assert!(matches!(strip.content(0, "one"), (Some(Mark::Letter('O')), false)), "without icons, its letter");
     }
 
     #[test]

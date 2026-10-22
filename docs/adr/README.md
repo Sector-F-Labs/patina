@@ -62,6 +62,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0018](0018-tabs-with-icons.md) | TabStrip can show an icon on each tab, with or without its title | Proposed |
 | [0019](0019-kinetic-scrolling-on-a-touchpad.md) | A touchpad flick keeps scrolling after the fingers lift, through `patina::kinetic` | Proposed |
 | [0020](0020-ctrl-t-and-w-and-a-terminals-keys.md) | Tabs take Ctrl+T and Ctrl+W; a terminal takes them with Shift | Proposed |
+| [0021](0021-tabs-that-move-and-launchers.md) | Tabs can be dragged into another order, and some tabs can be launchers | Proposed |
 
 ## Decision Relationship
 
@@ -84,6 +85,7 @@ flowchart TD
     I --> M[0013: Alt and a number shows that tab]
     I --> N[0014: Tabs that can't close]
     I --> Q[0018: Tabs with icons]
+    Q --> S[0021: Tabs that move, and launchers]
     C --> O[0016: Status bar for messages]
     K --> P[0017: Skin menu holds only controls]
     O --> P
