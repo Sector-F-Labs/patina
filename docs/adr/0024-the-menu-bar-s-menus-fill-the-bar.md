@@ -1,12 +1,12 @@
-# 0024. The menu bar's menus fill the bar, and light as the shown tab
+# 0024. The menu bar's menus fill the bar, and light as a hovered tab
 
 Date: 2026-10-24
 
 ## Status
 
 Accepted. The user asked for a larger target on the title bar's menus, one you can see under the
-pointer, lit in the same colour as the shown tab. Filling the bar's full height is my reading of
-that, to match the tabs beside them.
+pointer. Filling the bar's full height is my reading of that, to match the tabs beside them; the
+colour it lights in is the user's choice, below.
 
 ## Context
 
@@ -31,13 +31,11 @@ apps already put in it. The menus inside the popups stay egui's (ADR-0023).
   from the window's edge, so on a rounded window its lit fill takes the window's radius at the
   top-left (the shape is rounded after egui paints it), and stays inside the corner.
 - **The divider before the tabs stays the row's height,** not the bar's, as long as before.
-- **Under the pointer or pressed, a menu is filled with the shown tab's colour**
-  (`frame::lit`, shared with the tabs) with the strong text colour, square, so the target is
-  what you see.
-- On a bar the skin colours, a menu's name keeps the bar's title colour at rest and takes the
-  strong text colour when lit, where the bar's title colour might not read.
-- The tabs after the menus keep their own hover colours: the title bar keeps the bar's widget
-  colours aside for the tab strip, since the menu bar's style covers its whole slot.
+- **Under the pointer or pressed, a menu is lit in the bar's hover colour,** square, as a hovered
+  tab is in Patina's tab strip, Teleprinter and the Patina bar. The shown tab's colour is left to
+  mean the shown tab. A first version lit menus in the shown tab's colour, as first asked; next to
+  tabs lit in the hover colour the bar disagreed with itself, and the user chose to follow
+  Teleprinter and the Patina bar.
 
 ## Consequences
 

@@ -357,17 +357,15 @@ impl<'a> TitleBar<'a> {
             ui.cursor().left()
         };
         let left_end = if menu_bar {
-            let widgets = left_ui.visuals().widgets.clone();
-            ctx.data_mut(|d| d.insert_temp(bar_widgets_id(), widgets));
-            let lit = lit(style.title_bar, &ctx.global_style().visuals);
-            let strong = ctx.global_style().visuals.strong_text_color();
+            let w = &left_ui.visuals().widgets;
+            let lit = [w.hovered.weak_bg_fill, w.active.weak_bg_fill];
             let height = left_rect.height();
             // The menu bar's row takes this before its style applies.
             left_ui.spacing_mut().interact_size.y = height;
             let layer = left_ui.layer_id();
             let from = ctx.graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
             let end = egui::MenuBar::new()
-                .style(move |s: &mut egui::Style| menu_bar_style(s, height, lit, strong))
+                .style(move |s: &mut egui::Style| menu_bar_style(s, height))
                 .ui(&mut left_ui, measured)
                 .inner;
             if custom {
@@ -426,31 +424,25 @@ fn bar_controls(ui: &mut egui::Ui, style: &FrameStyle) {
     v.selection.stroke.color = ink;
 }
 
-/// The fill of the shown tab, and of the menu bar's menu under the pointer
-/// (ADR-0024): the panel colour on a bar coloured by its skin, so the shown
-/// tab joins the panel below, and the extreme background on a bar already in
-/// the panel colour.
-pub(crate) fn lit(bar: Color32, visuals: &egui::Visuals) -> Color32 {
-    if bar == visuals.panel_fill {
-        visuals.extreme_bg_color
-    } else {
-        visuals.panel_fill
-    }
-}
-
-/// Rounds the first menu's fill, lit in `lit` and painted on `layer` from
+/// Rounds the first menu's fill, lit in one of `lit` and painted on `layer` from
 /// shape `from` on, as the window's top-left corner is rounded, so it
 /// doesn't show past the corner. Starting inside the window, it stays
 /// inside with the window's own radius.
-fn round_corner(ctx: &egui::Context, layer: egui::LayerId, from: usize, lit: Color32, radius: u8) {
+fn round_corner(
+    ctx: &egui::Context,
+    layer: egui::LayerId,
+    from: usize,
+    lit: [Color32; 2],
+    radius: u8,
+) {
     if radius == 0 {
         return;
     }
     let corner = ctx.content_rect().min + egui::Vec2::splat(f32::from(radius));
-    fn round(shape: &mut egui::Shape, corner: egui::Pos2, lit: Color32, radius: u8) {
+    fn round(shape: &mut egui::Shape, corner: egui::Pos2, lit: [Color32; 2], radius: u8) {
         match shape {
             egui::Shape::Rect(r)
-                if r.fill == lit && r.rect.min.x < corner.x && r.rect.min.y < corner.y =>
+                if lit.contains(&r.fill) && r.rect.min.x < corner.x && r.rect.min.y < corner.y =>
             {
                 r.corner_radius.nw = radius;
             }
@@ -472,43 +464,17 @@ fn round_corner(ctx: &egui::Context, layer: egui::LayerId, from: usize, lit: Col
     });
 }
 
-fn bar_widgets_id() -> Id {
-    Id::new("patina_bar_widgets")
-}
-
-/// The bar's widget colours as they were before the menu bar lit its
-/// menus, for the tabs after them, which light up their own way. Outside a
-/// menu bar, `ui`'s own.
-pub(crate) fn bar_widgets(ui: &egui::Ui) -> egui::style::Widgets {
-    egui::containers::menu::is_in_menu(ui)
-        .then(|| ui.data(|d| d.get_temp(bar_widgets_id())))
-        .flatten()
-        .unwrap_or_else(|| ui.visuals().widgets.clone())
-}
-
 /// The menu bar's style (ADR-0024): egui's menu style, with each menu
 /// `height` tall, the bar's, and side by side with no gap, so the whole bar
-/// above a name opens it, lit in `lit` with `strong` text under the pointer
-/// or pressed, square like the tabs.
-fn menu_bar_style(style: &mut egui::Style, height: f32, lit: Color32, strong: Color32) {
+/// above a name opens it, lit in the bar's hover colour as the tabs are, and
+/// square like them.
+fn menu_bar_style(style: &mut egui::Style, height: f32) {
     egui::containers::menu::menu_style(style);
     style.spacing.interact_size.y = height;
     style.spacing.button_padding = vec2(MENU_PADDING, 0.0);
     style.spacing.item_spacing.x = 0.0;
-    let v = &mut style.visuals;
-    // A coloured bar's ink is in the widgets' colours too (`bar_controls`);
-    // the override would keep it on the lit fill, where it may not read.
-    if let Some(ink) = v.override_text_color.take() {
-        v.widgets.noninteractive.fg_stroke.color = ink;
-    }
-    for w in [
-        &mut v.widgets.hovered,
-        &mut v.widgets.active,
-        &mut v.widgets.open,
-    ] {
-        w.weak_bg_fill = lit;
-        w.bg_fill = lit;
-        w.fg_stroke.color = strong;
+    let w = &mut style.visuals.widgets;
+    for w in [&mut w.hovered, &mut w.active, &mut w.open] {
         w.corner_radius = egui::CornerRadius::ZERO;
         w.expansion = 0.0;
     }

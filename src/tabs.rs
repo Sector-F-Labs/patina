@@ -283,7 +283,11 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         let mut own_tooltip = self.own_tooltip.take();
         let mut moved = self.moved.take();
         let global = ui.ctx().global_style();
-        let shown = crate::frame::lit(self.bar, &global.visuals);
+        let shown = if self.bar == global.visuals.panel_fill {
+            global.visuals.extreme_bg_color
+        } else {
+            global.visuals.panel_fill
+        };
         // The menus' text colour, and the panel's for the shown tab.
         let ink = ui.visuals().widgets.inactive.text_color();
         let mut action = None;
@@ -299,8 +303,6 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             ui.add_space((8.0 - ui.spacing().item_spacing.x).max(0.0));
         }
         ui.spacing_mut().item_spacing.x = 0.0;
-        // Lit as tabs, not as the menus before them.
-        ui.visuals_mut().widgets = crate::frame::bar_widgets(ui);
         let launchers = (0..self.titles.len()).filter(|&i| self.launcher(i)).count();
         let n = (self.titles.len() - launchers).max(1) as f32;
         let plus = if self.new_tab { PLUS } else { 0.0 };
