@@ -73,6 +73,9 @@ make check        # tests and clippy
 make screenshot   # docs/gallery-*.png
 ```
 
+What changed in each version, and what an app has to change to take it, is in
+[CHANGELOG.md](CHANGELOG.md). Add to its Unreleased section in the same commit as the change.
+
 Decisions are recorded as ADRs in [docs/adr](docs/adr/README.md), and we recommend the same for
 every Patina app.
 

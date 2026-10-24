@@ -66,6 +66,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0022](0022-clickable-elements-are-at-least-24-px.md) | Clickable elements are at least 24 px, and menus' items 24 px high | Menus superseded by 0023 |
 | [0023](0023-menus-are-egui-s-own-size.md) | Menus are egui's own size, as Teleprinter's | Accepted |
 | [0024](0024-the-menu-bar-s-menus-fill-the-bar.md) | The menu bar's menus fill the bar, and light as a hovered tab | Accepted |
+| [0025](0025-a-changelog-for-apps.md) | A changelog for apps: what changed in each version, and what an app has to change | Accepted |
 
 ## Decision Relationship
 
@@ -97,6 +98,7 @@ flowchart TD
     T --> U[0023: Menus are egui's own size]
     F --> V[0024: Menu bar's menus fill the bar]
     I --> V
+    A --> W[0025: A changelog for apps]
 ```
 
 ## Revisit Triggers
