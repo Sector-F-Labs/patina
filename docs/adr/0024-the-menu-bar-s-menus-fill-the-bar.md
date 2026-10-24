@@ -26,9 +26,10 @@ apps already put in it. The menus inside the popups stay egui's (ADR-0023).
   row.
 - **The menus have 10 px either side of their names and no gap between them**, so the whole bar
   above and between the names opens a menu.
-- **The first menu's name stays where it was.** The menus start 8 px further left, and the slot is
-  clipped at the bar's padding, so the first menu's box starts there, clear of the window's
-  rounded corner.
+- **The first menu's name stays where it was.** The menus start 8 px further left, so the first
+  menu's padding takes the bar's margin instead of pushing its name along. Its box reaches 4 px
+  from the window's edge, so on a rounded window its lit fill takes the window's radius at the
+  top-left (the shape is rounded after egui paints it), and stays inside the corner.
 - **The divider before the tabs stays the row's height,** not the bar's, as long as before.
 - **Under the pointer or pressed, a menu is filled with the shown tab's colour**
   (`frame::lit`, shared with the tabs) with the strong text colour, square, so the target is

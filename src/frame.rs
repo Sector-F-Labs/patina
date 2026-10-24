@@ -336,10 +336,9 @@ impl<'a> TitleBar<'a> {
             (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let mut left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
-        let left_edge = left_rect.left();
         if menu_bar {
-            // The first menu's name stays where egui's menu bar put it: the
-            // padding added to it falls before the edge, clipped off.
+            // The first menu's name stays where egui's menu bar put it, its
+            // box reaching into the bar's padding.
             left_rect.min.x -= MENU_PADDING - EGUI_MENU_PADDING;
             if let Some(span) = span {
                 left_rect = egui::Rect::from_x_y_ranges(left_rect.x_range(), span);
@@ -350,9 +349,6 @@ impl<'a> TitleBar<'a> {
             left_rect,
             egui::Layout::left_to_right(egui::Align::Center),
         );
-        let mut clip = left_ui.clip_rect();
-        clip.min.x = clip.min.x.max(left_edge);
-        left_ui.set_clip_rect(clip);
         bar_controls(&mut left_ui, style);
         steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
@@ -368,10 +364,16 @@ impl<'a> TitleBar<'a> {
             let height = left_rect.height();
             // The menu bar's row takes this before its style applies.
             left_ui.spacing_mut().interact_size.y = height;
-            egui::MenuBar::new()
+            let layer = left_ui.layer_id();
+            let from = ctx.graphics(|g| g.get(layer).map_or(0, |l| l.next_idx().0));
+            let end = egui::MenuBar::new()
                 .style(move |s: &mut egui::Style| menu_bar_style(s, height, lit, strong))
                 .ui(&mut left_ui, measured)
-                .inner
+                .inner;
+            if custom {
+                round_corner(&ctx, layer, from, lit, corner_radius(&ctx, style.radius));
+            }
+            end
         } else {
             measured(&mut left_ui)
         };
@@ -434,6 +436,40 @@ pub(crate) fn lit(bar: Color32, visuals: &egui::Visuals) -> Color32 {
     } else {
         visuals.panel_fill
     }
+}
+
+/// Rounds the first menu's fill, lit in `lit` and painted on `layer` from
+/// shape `from` on, as the window's top-left corner is rounded, so it
+/// doesn't show past the corner. Starting inside the window, it stays
+/// inside with the window's own radius.
+fn round_corner(ctx: &egui::Context, layer: egui::LayerId, from: usize, lit: Color32, radius: u8) {
+    if radius == 0 {
+        return;
+    }
+    let corner = ctx.content_rect().min + egui::Vec2::splat(f32::from(radius));
+    fn round(shape: &mut egui::Shape, corner: egui::Pos2, lit: Color32, radius: u8) {
+        match shape {
+            egui::Shape::Rect(r)
+                if r.fill == lit && r.rect.min.x < corner.x && r.rect.min.y < corner.y =>
+            {
+                r.corner_radius.nw = radius;
+            }
+            egui::Shape::Vec(shapes) => {
+                for s in shapes {
+                    round(s, corner, lit, radius);
+                }
+            }
+            _ => {}
+        }
+    }
+    ctx.graphics_mut(|g| {
+        let list = g.entry(layer);
+        for i in from..list.next_idx().0 {
+            list.mutate_shape(egui::layers::ShapeIdx(i), |c| {
+                round(&mut c.shape, corner, lit, radius);
+            });
+        }
+    });
 }
 
 fn bar_widgets_id() -> Id {
