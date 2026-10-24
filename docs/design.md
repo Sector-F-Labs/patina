@@ -76,6 +76,10 @@ Implemented by `patina::frame`.
   - When a skin colours the bar, the bar's own menus and buttons are drawn in its title colour.
     Their menus open in the skin's normal colours.
   - The bar's padding is 12 px horizontal and 8 px vertical. The row is 25 px high.
+  - **The menu bar's menus fill the bar's height** and sit side by side, 10 px either side of
+    their names, lit under the pointer in the shown tab's colour
+    ([ADR-0024](adr/0024-the-menu-bar-s-menus-fill-the-bar.md)). Pass the bar's span to
+    `TitleBar::span`, as to `TabStrip::span`.
 - **Window buttons:** minimise, maximise/restore and close, 30×22 px, 4 px apart, kept 8 px from
   the right-hand controls.
   - They're quiet until hovered. Close turns red (`#c01c28`, GNOME's, as a default) with a white

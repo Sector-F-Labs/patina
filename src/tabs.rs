@@ -15,7 +15,7 @@
 //! egui::Panel::top("header").frame(header).show(ui, |ui| {
 //!     // The bar's full height, padding and all, for the tabs to fill.
 //!     let span = (ui.max_rect() + header.inner_margin).y_range();
-//!     TitleBar::new("", style).menu_bar(true).show(
+//!     TitleBar::new("", style).menu_bar(true).span(span).show(
 //!         ui,
 //!         |ui| {
 //!             // ... the menus ...
@@ -283,11 +283,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         let mut own_tooltip = self.own_tooltip.take();
         let mut moved = self.moved.take();
         let global = ui.ctx().global_style();
-        let shown = if self.bar == global.visuals.panel_fill {
-            global.visuals.extreme_bg_color
-        } else {
-            global.visuals.panel_fill
-        };
+        let shown = crate::frame::lit(self.bar, &global.visuals);
         // The menus' text colour, and the panel's for the shown tab.
         let ink = ui.visuals().widgets.inactive.text_color();
         let mut action = None;
@@ -295,6 +291,8 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
             ui.separator();
         }
         ui.spacing_mut().item_spacing.x = 0.0;
+        // Lit as tabs, not as the menus before them.
+        ui.visuals_mut().widgets = crate::frame::bar_widgets(ui);
         let launchers = (0..self.titles.len()).filter(|&i| self.launcher(i)).count();
         let n = (self.titles.len() - launchers).max(1) as f32;
         let plus = if self.new_tab { PLUS } else { 0.0 };

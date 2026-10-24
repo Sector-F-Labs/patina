@@ -28,6 +28,8 @@ const BUTTON: egui::Vec2 = vec2(30.0, 22.0);
 const ROW_HEIGHT: f32 = 25.0;
 /// Space between the app's right-hand controls and the window buttons.
 const CONTROLS_GAP: f32 = 8.0;
+/// Space either side of a menu's name in the menu bar.
+const MENU_PADDING: f32 = 10.0;
 
 /// libadwaita's `--window-radius`, as shipped in Ubuntu's Yaru styles too.
 pub const WINDOW_RADIUS: u8 = 15;
@@ -201,6 +203,7 @@ pub struct TitleBar<'a> {
     custom: bool,
     menu_bar: bool,
     minimise: bool,
+    span: Option<egui::Rangef>,
 }
 
 impl<'a> TitleBar<'a> {
@@ -211,7 +214,16 @@ impl<'a> TitleBar<'a> {
             custom: true,
             menu_bar: false,
             minimise: true,
+            span: None,
         }
+    }
+
+    /// The bar's full height, padding and all, as given to
+    /// [`TabStrip::span`](crate::tabs::TabStrip::span): the menus in a menu
+    /// bar fill it, as the tabs do. Without it they fill the row.
+    pub fn span(mut self, span: egui::Rangef) -> Self {
+        self.span = Some(span);
+        self
     }
 
     /// Whether the window buttons include minimise (the default, where the
@@ -250,6 +262,7 @@ impl<'a> TitleBar<'a> {
             custom,
             menu_bar,
             minimise,
+            span,
         } = self;
         let ctx = ui.ctx().clone();
         let bar = ui.max_rect();
@@ -320,7 +333,10 @@ impl<'a> TitleBar<'a> {
         let right_width =
             (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
-        let left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
+        let mut left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
+        if menu_bar && let Some(span) = span {
+            left_rect = egui::Rect::from_x_y_ranges(left_rect.x_range(), span);
+        }
         let mut left_ui = child(
             ui,
             left_rect,
@@ -334,7 +350,17 @@ impl<'a> TitleBar<'a> {
             ui.cursor().left()
         };
         let left_end = if menu_bar {
-            egui::MenuBar::new().ui(&mut left_ui, measured).inner
+            let widgets = left_ui.visuals().widgets.clone();
+            ctx.data_mut(|d| d.insert_temp(bar_widgets_id(), widgets));
+            let lit = lit(style.title_bar, &ctx.global_style().visuals);
+            let strong = ctx.global_style().visuals.strong_text_color();
+            let height = left_rect.height();
+            // The menu bar's row takes this before its style applies.
+            left_ui.spacing_mut().interact_size.y = height;
+            egui::MenuBar::new()
+                .style(move |s: &mut egui::Style| menu_bar_style(s, height, lit, strong))
+                .ui(&mut left_ui, measured)
+                .inner
         } else {
             measured(&mut left_ui)
         };
@@ -385,6 +411,60 @@ fn bar_controls(ui: &mut egui::Ui, style: &FrameStyle) {
     }
     v.selection.bg_fill = ink.gamma_multiply(0.26);
     v.selection.stroke.color = ink;
+}
+
+/// The fill of the shown tab, and of the menu bar's menu under the pointer
+/// (ADR-0024): the panel colour on a bar coloured by its skin, so the shown
+/// tab joins the panel below, and the extreme background on a bar already in
+/// the panel colour.
+pub(crate) fn lit(bar: Color32, visuals: &egui::Visuals) -> Color32 {
+    if bar == visuals.panel_fill {
+        visuals.extreme_bg_color
+    } else {
+        visuals.panel_fill
+    }
+}
+
+fn bar_widgets_id() -> Id {
+    Id::new("patina_bar_widgets")
+}
+
+/// The bar's widget colours as they were before the menu bar lit its
+/// menus, for the tabs after them, which light up their own way. Outside a
+/// menu bar, `ui`'s own.
+pub(crate) fn bar_widgets(ui: &egui::Ui) -> egui::style::Widgets {
+    egui::containers::menu::is_in_menu(ui)
+        .then(|| ui.data(|d| d.get_temp(bar_widgets_id())))
+        .flatten()
+        .unwrap_or_else(|| ui.visuals().widgets.clone())
+}
+
+/// The menu bar's style (ADR-0024): egui's menu style, with each menu
+/// `height` tall, the bar's, and side by side with no gap, so the whole bar
+/// above a name opens it, lit in `lit` with `strong` text under the pointer
+/// or pressed, square like the tabs.
+fn menu_bar_style(style: &mut egui::Style, height: f32, lit: Color32, strong: Color32) {
+    egui::containers::menu::menu_style(style);
+    style.spacing.interact_size.y = height;
+    style.spacing.button_padding = vec2(MENU_PADDING, 0.0);
+    style.spacing.item_spacing.x = 0.0;
+    let v = &mut style.visuals;
+    // A coloured bar's ink is in the widgets' colours too (`bar_controls`);
+    // the override would keep it on the lit fill, where it may not read.
+    if let Some(ink) = v.override_text_color.take() {
+        v.widgets.noninteractive.fg_stroke.color = ink;
+    }
+    for w in [
+        &mut v.widgets.hovered,
+        &mut v.widgets.active,
+        &mut v.widgets.open,
+    ] {
+        w.weak_bg_fill = lit;
+        w.bg_fill = lit;
+        w.fg_stroke.color = strong;
+        w.corner_radius = egui::CornerRadius::ZERO;
+        w.expansion = 0.0;
+    }
 }
 
 /// Takes the strokes off the bar's controls. egui draws an idle toggle
@@ -769,6 +849,47 @@ mod hover_tests {
             rects(&ctx, t, vec![egui::Event::PointerMoved(r.center())]);
             let hovered = rects(&ctx, t + 0.1, vec![]);
             assert_eq!(hovered, rest, "hovering control {i} moved the others");
+        }
+    }
+
+    #[test]
+    fn the_menus_fill_the_bar_side_by_side() {
+        let ctx = egui::Context::default();
+        let mut found = (egui::Rangef::NOTHING, Vec::new());
+        for t in [0.1, 0.2] {
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    vec2(1100.0, 700.0),
+                )),
+                time: Some(t),
+                ..Default::default()
+            };
+            let _ = ctx.run_ui(input, |ui| {
+                let style = FrameStyle::from_visuals(ui.visuals());
+                let header = header_frame(ui.style(), &style, 0);
+                egui::Panel::top("bar").frame(header).show(ui, |ui| {
+                    let span = (ui.max_rect() + header.inner_margin).y_range();
+                    let mut menus = Vec::new();
+                    TitleBar::new("", &style).menu_bar(true).span(span).show(
+                        ui,
+                        |ui| {
+                            for m in ["File", "Edit", "View"] {
+                                menus.push(ui.menu_button(m, |_| {}).response.rect);
+                            }
+                        },
+                        |_| {},
+                    );
+                    found = (span, menus);
+                });
+            });
+        }
+        let (span, menus) = found;
+        for m in &menus {
+            assert_eq!(m.y_range(), span, "a menu doesn't fill the bar's height");
+        }
+        for pair in menus.windows(2) {
+            assert_eq!(pair[0].right(), pair[1].left(), "menus with a gap between");
         }
     }
 

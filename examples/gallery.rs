@@ -228,6 +228,7 @@ impl Gallery {
         TitleBar::new("", style)
             .custom(self.custom_frame)
             .menu_bar(true)
+            .span(span)
             .show(
                 ui,
                 |ui| {

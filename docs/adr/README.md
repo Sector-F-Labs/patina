@@ -65,6 +65,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0021](0021-tabs-that-move-and-launchers.md) | Tabs can be dragged into another order, and some tabs can be launchers | Proposed |
 | [0022](0022-clickable-elements-are-at-least-24-px.md) | Clickable elements are at least 24 px, and menus' items 24 px high | Menus superseded by 0023 |
 | [0023](0023-menus-are-egui-s-own-size.md) | Menus are egui's own size, as Teleprinter's | Accepted |
+| [0024](0024-the-menu-bar-s-menus-fill-the-bar.md) | The menu bar's menus fill the bar, and light as the shown tab | Accepted |
 
 ## Decision Relationship
 
@@ -94,6 +95,8 @@ flowchart TD
     C --> R[0019: Kinetic scrolling on a touchpad]
     P --> T[0022: Clickable at least 24 px, menus 24 an item]
     T --> U[0023: Menus are egui's own size]
+    F --> V[0024: Menu bar's menus fill the bar]
+    I --> V
 ```
 
 ## Revisit Triggers
@@ -108,4 +111,6 @@ flowchart TD
   what it supports. See [ADR-0008](0008-window-buttons-follow-the-compositor.md).
 - egui glides after a touchpad lift itself, or winit exposes libinput's hold gesture. See
   [ADR-0019](0019-kinetic-scrolling-on-a-touchpad.md).
+- egui lights a menu bar's open menu, or lets the bar find its menus' buttons. See
+  [ADR-0024](0024-the-menu-bar-s-menus-fill-the-bar.md).
 - A component only one app uses keeps growing app-specific options. Move it back into the app.
