@@ -694,6 +694,96 @@ fn cursor(direction: ResizeDirection) -> CursorIcon {
     }
 }
 
+/// epaint's own rounding added to a rounded corner, which the border has too.
+const EPAINT_ROUNDING_TWEAK: f32 = 0.4;
+
+/// Gives the panels holding the window's corners their full rounding where
+/// epaint would cut it short. epaint rounds a corner by at most half the
+/// rect's shorter side, so a status bar under 31 px high got its 15 px
+/// corners cut to half its height and showed past the border, which keeps
+/// the full radius. Such a fill is redrawn as a path, rounded as the border
+/// is.
+fn round_short_corners(ctx: &egui::Context, window: egui::Rect) {
+    fn fix(shape: &mut egui::Shape, window: egui::Rect) {
+        match shape {
+            egui::Shape::Rect(r) if short_corner(r, window) => {
+                *shape = rounded_fill(r.rect, r.corner_radius, r.fill);
+            }
+            egui::Shape::Vec(shapes) => {
+                for s in shapes {
+                    fix(s, window);
+                }
+            }
+            _ => {}
+        }
+    }
+    ctx.graphics_mut(|g| {
+        let list = g.entry(egui::LayerId::background());
+        for i in 0..list.next_idx().0 {
+            list.mutate_shape(egui::layers::ShapeIdx(i), |c| fix(&mut c.shape, window));
+        }
+    });
+}
+
+/// Whether `r` is a plain fill with a rounded corner on one of `window`'s
+/// that epaint would round less than asked.
+fn short_corner(r: &egui::epaint::RectShape, window: egui::Rect) -> bool {
+    let cr = r.corner_radius;
+    let plain = r.stroke.width == 0.0 && r.blur_width == 0.0 && r.brush.is_none() && r.angle == 0.0;
+    let at = |a: egui::Pos2, b: egui::Pos2| (a - b).length() < 0.5;
+    let (rect, half) = (r.rect, r.rect.size().min_elem() / 2.0);
+    let short = |radius: u8, corner: egui::Pos2, window: egui::Pos2| {
+        radius > 0 && f32::from(radius) + EPAINT_ROUNDING_TWEAK > half && at(corner, window)
+    };
+    plain
+        && (short(cr.nw, rect.left_top(), window.left_top())
+            || short(cr.ne, rect.right_top(), window.right_top())
+            || short(cr.sw, rect.left_bottom(), window.left_bottom())
+            || short(cr.se, rect.right_bottom(), window.right_bottom()))
+}
+
+/// `rect` filled with `cr` at its corners, as epaint would round it without
+/// cutting the radius to the rect's size.
+fn rounded_fill(rect: egui::Rect, cr: egui::CornerRadius, fill: Color32) -> egui::Shape {
+    use egui::epaint::tessellator::path::add_circle_quadrant;
+    // A corner can still be no larger than the rect itself.
+    let r = |radius: u8| {
+        if radius == 0 {
+            0.0
+        } else {
+            (f32::from(radius) + EPAINT_ROUNDING_TWEAK).min(rect.size().min_elem())
+        }
+    };
+    let (min, max) = (rect.min, rect.max);
+    let mut points = Vec::new();
+    for (centre, radius, quadrant) in [
+        (
+            egui::pos2(max.x - r(cr.se), max.y - r(cr.se)),
+            r(cr.se),
+            0.0,
+        ),
+        (
+            egui::pos2(min.x + r(cr.sw), max.y - r(cr.sw)),
+            r(cr.sw),
+            1.0,
+        ),
+        (
+            egui::pos2(min.x + r(cr.nw), min.y + r(cr.nw)),
+            r(cr.nw),
+            2.0,
+        ),
+        (
+            egui::pos2(max.x - r(cr.ne), min.y + r(cr.ne)),
+            r(cr.ne),
+            3.0,
+        ),
+    ] {
+        add_circle_quadrant(&mut points, centre, radius, quadrant);
+    }
+    points.dedup();
+    egui::Shape::convex_polygon(points, fill, Stroke::NONE)
+}
+
 /// The border and resize handles. Call after everything else is drawn, so
 /// the handles sit above the floating windows along the edges.
 pub fn edges(ctx: &egui::Context, radius: u8, border: Color32) {
@@ -701,6 +791,7 @@ pub fn edges(ctx: &egui::Context, radius: u8, border: Color32) {
         return;
     }
     let window = ctx.content_rect();
+    round_short_corners(ctx, window);
     let painter = ctx.layer_painter(egui::LayerId::new(
         Order::Foreground,
         Id::new("window_border"),
@@ -824,6 +915,40 @@ mod tests {
             edge_at(w, egui::pos2(790.0, 598.0)),
             Some(ResizeDirection::SouthEast)
         );
+    }
+
+    #[test]
+    fn a_short_status_bar_keeps_the_window_s_rounding() {
+        let w = window();
+        let bar = |rect: egui::Rect, cr: egui::CornerRadius| {
+            egui::epaint::RectShape::filled(rect, cr, Color32::RED)
+        };
+        let bottom = egui::CornerRadius {
+            sw: WINDOW_RADIUS,
+            se: WINDOW_RADIUS,
+            ..Default::default()
+        };
+        let top = egui::CornerRadius {
+            nw: WINDOW_RADIUS,
+            ne: WINDOW_RADIUS,
+            ..Default::default()
+        };
+        let status = egui::Rect::from_min_max(egui::pos2(0.0, 574.0), w.max);
+        assert!(short_corner(&bar(status, bottom), w));
+        // Tall enough for epaint to round it fully.
+        let header = egui::Rect::from_min_max(w.min, egui::pos2(800.0, 41.0));
+        assert!(!short_corner(&bar(header, top), w));
+        // Not at the window's corners.
+        let inside = status.translate(vec2(0.0, -100.0));
+        assert!(!short_corner(&bar(inside, bottom), w));
+
+        let egui::Shape::Path(path) = rounded_fill(status, bottom, Color32::RED) else {
+            panic!("not a path");
+        };
+        assert!(path.points.iter().all(|p| status.expand(0.01).contains(*p)));
+        // The bottom-left arc reaches the full radius up the side.
+        let r = f32::from(WINDOW_RADIUS) + EPAINT_ROUNDING_TWEAK;
+        assert!(path.points.contains(&egui::pos2(0.0, 600.0 - r)));
     }
 
     #[test]

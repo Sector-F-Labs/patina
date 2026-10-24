@@ -96,6 +96,8 @@ Implemented by `patina::frame`.
 - **Corners:** a 15 px window radius by default (borrowed from GNOME; skins change it), square
   while maximised or full screen.
   - The clear colour is transparent, so the panel holding each corner carries the rounding.
+  - A panel too short for its corners, such as a status bar under 31 px, still gets the full
+    radius: epaint would round it by at most half its height, so `frame::edges` redraws it.
   - The header bar holds both top corners. The bottom corners belong to whichever panels sit
     there, e.g. a sidebar on the left and the central panel on the right, or a status bar
     across the bottom holding both.
