@@ -11,9 +11,9 @@
 use std::path::PathBuf;
 
 use eframe::egui;
+use patina::frame::{self, FrameStyle, TitleBar};
 use patina::ime;
 use patina::kinetic;
-use patina::frame::{self, FrameStyle, TitleBar};
 use patina::skin::{self, Skin};
 use patina::tabs::{self, TabAction, TabStrip};
 use patina::tree::FolderTree;
@@ -30,7 +30,11 @@ fn main() -> eframe::Result {
         ),
         ..Default::default()
     };
-    eframe::run_native("patina-gallery", options, Box::new(|cc| Ok(Box::new(Gallery::new(cc)))))
+    eframe::run_native(
+        "patina-gallery",
+        options,
+        Box::new(|cc| Ok(Box::new(Gallery::new(cc)))),
+    )
 }
 
 struct Gallery {
@@ -74,7 +78,9 @@ impl Gallery {
             .or_else(|| std::env::var_os("HOME"))
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("/"));
-        let label = root.file_name().map_or("/".into(), |n| n.to_string_lossy().into_owned());
+        let label = root
+            .file_name()
+            .map_or("/".into(), |n| n.to_string_lossy().into_owned());
         let gallery = Self {
             custom_frame: true,
             skins,
@@ -140,9 +146,9 @@ impl Gallery {
             changed = true;
         }
         if let Some(dir) = skin::app_dir(GALLERY) {
-            let resp = ui
-                .button("Copy built-in skins to folder")
-                .on_hover_text("Puts editable copies in the skins folder; never overwrites existing files");
+            let resp = ui.button("Copy built-in skins to folder").on_hover_text(
+                "Puts editable copies in the skins folder; never overwrites existing files",
+            );
             if resp.clicked() {
                 self.status = Some(match skin::export_built_ins(&dir, skin::BUILT_IN) {
                     Ok(export) => {
@@ -155,7 +161,11 @@ impl Gallery {
                     Err(e) => Status::error(format!("Couldn't copy skins: {e}")),
                 });
             }
-            if ui.button("Open skins folder").on_hover_text(dir.display().to_string()).clicked() {
+            if ui
+                .button("Open skins folder")
+                .on_hover_text(dir.display().to_string())
+                .clicked()
+            {
                 let _ = std::fs::create_dir_all(&dir);
                 let _ = patina::open::path(&dir);
             }
@@ -178,11 +188,18 @@ impl Gallery {
         ui.horizontal(|ui| {
             // Just the version: the app's name is already in the title bar and the window list,
             // so repeating it here adds nothing.
-            ui.label(egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION"))).weak().small());
+            ui.label(
+                egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                    .weak()
+                    .small(),
+            );
             // Skins that failed to load stay until they load, ahead of any newer message.
             let skin_errors = (!self.skin_errors.is_empty()).then(|| {
                 let n = self.skin_errors.len();
-                Status::error(format!("Couldn't load {n} skin{}", if n == 1 { "" } else { "s" }))
+                Status::error(format!(
+                    "Couldn't load {n} skin{}",
+                    if n == 1 { "" } else { "s" }
+                ))
             });
             if let Some(status) = skin_errors.as_ref().or(self.status.as_ref()) {
                 ui.separator();
@@ -199,26 +216,41 @@ impl Gallery {
         });
     }
 
-    fn header(&mut self, ui: &mut egui::Ui, style: &FrameStyle, span: egui::Rangef) -> Option<TabAction> {
+    fn header(
+        &mut self,
+        ui: &mut egui::Ui,
+        style: &FrameStyle,
+        span: egui::Rangef,
+    ) -> Option<TabAction> {
         let ctx = ui.ctx().clone();
         let mut action = None;
         // No title: the tabs take its place.
-        TitleBar::new("", style).custom(self.custom_frame).menu_bar(true).show(
-            ui,
-            |ui| {
-                ui.menu_button("View", |ui| {
-                    if ui.checkbox(&mut self.custom_frame, "Patina frame").changed() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(!self.custom_frame));
-                    }
-                });
-                ui.menu_button("Skin", |ui| self.skin_menu(ui));
-                action = TabStrip::new(&self.tabs, self.tab, style).span(span).show(ui);
-            },
-            |ui| {
-                let _ = ui.button("Right");
-                ui.label(egui::RichText::new("right-hand controls").weak());
-            },
-        );
+        TitleBar::new("", style)
+            .custom(self.custom_frame)
+            .menu_bar(true)
+            .show(
+                ui,
+                |ui| {
+                    ui.menu_button("View", |ui| {
+                        if ui
+                            .checkbox(&mut self.custom_frame, "Patina frame")
+                            .changed()
+                        {
+                            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(
+                                !self.custom_frame,
+                            ));
+                        }
+                    });
+                    ui.menu_button("Skin", |ui| self.skin_menu(ui));
+                    action = TabStrip::new(&self.tabs, self.tab, style)
+                        .span(span)
+                        .show(ui);
+                },
+                |ui| {
+                    let _ = ui.button("Right");
+                    ui.label(egui::RichText::new("right-hand controls").weak());
+                },
+            );
         action
     }
 
@@ -245,37 +277,43 @@ impl Gallery {
         ui.heading("Widgets");
         ui.label("Stock egui widgets in the active visuals; a skin restyles all of these.");
         ui.add_space(8.0);
-        egui::Grid::new("widgets").num_columns(2).spacing([24.0, 10.0]).show(ui, |ui| {
-            ui.label("Buttons");
-            ui.horizontal(|ui| {
-                let _ = ui.button("Button");
-                let _ = ui.add(egui::Button::new("Selected").selected(true));
-                let _ = ui.add_enabled(false, egui::Button::new("Disabled"));
+        egui::Grid::new("widgets")
+            .num_columns(2)
+            .spacing([24.0, 10.0])
+            .show(ui, |ui| {
+                ui.label("Buttons");
+                ui.horizontal(|ui| {
+                    let _ = ui.button("Button");
+                    let _ = ui.add(egui::Button::new("Selected").selected(true));
+                    let _ = ui.add_enabled(false, egui::Button::new("Disabled"));
+                });
+                ui.end_row();
+                ui.label("Text");
+                ui.text_edit_singleline(&mut self.text);
+                ui.end_row();
+                ui.label("Slider");
+                ui.add(egui::Slider::new(&mut self.value, 0.0..=1.0));
+                ui.end_row();
+                ui.label("Check box");
+                ui.checkbox(&mut self.checked, "Checked");
+                ui.end_row();
+                ui.label("Choice");
+                ui.horizontal(|ui| {
+                    for (i, label) in ["One", "Two", "Three"].iter().enumerate() {
+                        ui.selectable_value(&mut self.choice, i, *label);
+                    }
+                });
+                ui.end_row();
+                ui.label("Progress");
+                ui.add(egui::ProgressBar::new(self.value).show_percentage());
+                ui.end_row();
+                ui.label("Link");
+                ui.hyperlink_to(
+                    "Patina on GitHub",
+                    "https://github.com/Sector-F-Labs/patina",
+                );
+                ui.end_row();
             });
-            ui.end_row();
-            ui.label("Text");
-            ui.text_edit_singleline(&mut self.text);
-            ui.end_row();
-            ui.label("Slider");
-            ui.add(egui::Slider::new(&mut self.value, 0.0..=1.0));
-            ui.end_row();
-            ui.label("Check box");
-            ui.checkbox(&mut self.checked, "Checked");
-            ui.end_row();
-            ui.label("Choice");
-            ui.horizontal(|ui| {
-                for (i, label) in ["One", "Two", "Three"].iter().enumerate() {
-                    ui.selectable_value(&mut self.choice, i, *label);
-                }
-            });
-            ui.end_row();
-            ui.label("Progress");
-            ui.add(egui::ProgressBar::new(self.value).show_percentage());
-            ui.end_row();
-            ui.label("Link");
-            ui.hyperlink_to("Patina on GitHub", "https://github.com/Sector-F-Labs/patina");
-            ui.end_row();
-        });
         ui.add_space(16.0);
         ui.heading("Folder tree");
         ui.label(format!("Selected: {}", self.current.display()));
@@ -331,11 +369,17 @@ enum Level {
 
 impl Status {
     fn error(text: impl Into<String>) -> Self {
-        Status { level: Level::Error, text: text.into() }
+        Status {
+            level: Level::Error,
+            text: text.into(),
+        }
     }
 
     fn info(text: impl Into<String>) -> Self {
-        Status { level: Level::Info, text: text.into() }
+        Status {
+            level: Level::Info,
+            text: text.into(),
+        }
     }
 }
 
@@ -353,7 +397,10 @@ fn export_summary(copied: &[String], skipped: &[String]) -> String {
 
 /// Patina's built-in skins and the gallery's own folder.
 fn load_skins() -> (Vec<Skin>, Vec<String>) {
-    skin::load_all(skin::BUILT_IN, &skin::app_dir(GALLERY).into_iter().collect::<Vec<_>>())
+    skin::load_all(
+        skin::BUILT_IN,
+        &skin::app_dir(GALLERY).into_iter().collect::<Vec<_>>(),
+    )
 }
 
 impl eframe::App for Gallery {
@@ -361,7 +408,11 @@ impl eframe::App for Gallery {
         let ctx = ui.ctx().clone();
         self.tree.poll();
         let style = self.skins[self.skin].frame_style(ui.visuals());
-        let radius = if self.custom_frame { frame::corner_radius(&ctx, style.radius) } else { 0 };
+        let radius = if self.custom_frame {
+            frame::corner_radius(&ctx, style.radius)
+        } else {
+            0
+        };
 
         // Taken before the widgets see them.
         let mut action = tabs::keys(&ctx, self.tabs.len(), self.tab);
@@ -381,7 +432,11 @@ impl eframe::App for Gallery {
             .frame(
                 egui::Frame::side_top_panel(ui.style())
                     .inner_margin(egui::Margin::symmetric(10, 4))
-                    .corner_radius(egui::CornerRadius { sw: radius, se: radius, ..Default::default() }),
+                    .corner_radius(egui::CornerRadius {
+                        sw: radius,
+                        se: radius,
+                        ..Default::default()
+                    }),
             )
             .show(ui, |ui| self.status_bar(ui));
         egui::Panel::left("sidebar")
