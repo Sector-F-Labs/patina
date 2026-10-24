@@ -419,8 +419,8 @@ impl eframe::App for Gallery {
         let mut action = tabs::keys(&ctx, self.tabs.len(), self.tab);
         let header = frame::header_frame(ui.style(), &style, radius);
         egui::Panel::top("header").frame(header).show(ui, |ui| {
-            // The bar's full height, padding and all, for the tabs to fill.
-            let span = (ui.max_rect() + header.inner_margin).y_range();
+            // The bar's full height, padding and all, for the menus and tabs to fill.
+            let span = frame::header_span(ui);
             action = action.or(self.header(ui, &style, span));
         });
         if let Some(action) = action {

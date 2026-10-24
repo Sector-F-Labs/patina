@@ -13,8 +13,8 @@
 //! let mut action = tabs::keys(ui.ctx(), titles.len(), shown);
 //! let header = frame::header_frame(ui.style(), style, frame::WINDOW_RADIUS);
 //! egui::Panel::top("header").frame(header).show(ui, |ui| {
-//!     // The bar's full height, padding and all, for the tabs to fill.
-//!     let span = (ui.max_rect() + header.inner_margin).y_range();
+//!     // The bar's full height, padding and all, for the menus and tabs to fill.
+//!     let span = frame::header_span(ui);
 //!     TitleBar::new("", style).menu_bar(true).span(span).show(
 //!         ui,
 //!         |ui| {

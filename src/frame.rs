@@ -28,6 +28,8 @@ const BUTTON: egui::Vec2 = vec2(30.0, 22.0);
 pub(crate) const ROW_HEIGHT: f32 = 25.0;
 /// Space between the app's right-hand controls and the window buttons.
 const CONTROLS_GAP: f32 = 8.0;
+/// The header bar's padding.
+const HEADER_MARGIN: egui::Margin = egui::Margin::symmetric(12, 8);
 /// Space either side of a menu's name in the menu bar.
 const MENU_PADDING: f32 = 10.0;
 /// egui's, in its `menu_style`.
@@ -176,13 +178,20 @@ pub fn corner_radius(ctx: &egui::Context, radius: u8) -> u8 {
 pub fn header_frame(style: &egui::Style, frame: &FrameStyle, radius: u8) -> egui::Frame {
     egui::Frame::side_top_panel(style)
         .fill(frame.title_bar)
-        .inner_margin(egui::Margin::symmetric(12, 8))
+        .inner_margin(HEADER_MARGIN)
         .corner_radius(egui::CornerRadius {
             nw: radius,
             ne: radius,
             sw: 0,
             se: 0,
         })
+}
+
+/// The header bar's full height, padding and all, from inside a panel
+/// framed by [`header_frame`]: the span for [`TitleBar::span`] and
+/// [`TabStrip::span`](crate::tabs::TabStrip::span).
+pub fn header_span(ui: &egui::Ui) -> egui::Rangef {
+    (ui.max_rect() + HEADER_MARGIN).y_range()
 }
 
 /// The header bar: the app's controls on the left and right, the title
@@ -1008,6 +1017,7 @@ mod hover_tests {
                 let header = header_frame(ui.style(), &style, 0);
                 egui::Panel::top("bar").frame(header).show(ui, |ui| {
                     let span = (ui.max_rect() + header.inner_margin).y_range();
+                    assert_eq!(header_span(ui), span);
                     let mut menus = Vec::new();
                     TitleBar::new("", &style).menu_bar(true).span(span).show(
                         ui,
