@@ -288,7 +288,15 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         let ink = ui.visuals().widgets.inactive.text_color();
         let mut action = None;
         if self.separator {
-            ui.separator();
+            // The row's height, not the bar's that the tabs span, and as
+            // far from the tabs in a menu bar, which has no item spacing.
+            let size = egui::vec2(6.0, crate::frame::ROW_HEIGHT.min(ui.available_height()));
+            ui.allocate_ui_with_layout(
+                size,
+                egui::Layout::left_to_right(egui::Align::Center),
+                |ui| ui.add(egui::Separator::default().vertical().spacing(6.0)),
+            );
+            ui.add_space((8.0 - ui.spacing().item_spacing.x).max(0.0));
         }
         ui.spacing_mut().item_spacing.x = 0.0;
         // Lit as tabs, not as the menus before them.

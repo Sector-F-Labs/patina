@@ -25,11 +25,13 @@ const EDGE: f32 = 5.0;
 const CORNER: f32 = 12.0;
 const BUTTON: egui::Vec2 = vec2(30.0, 22.0);
 /// Height of the header bar's row, set by Photograph's GTK-style buttons.
-const ROW_HEIGHT: f32 = 25.0;
+pub(crate) const ROW_HEIGHT: f32 = 25.0;
 /// Space between the app's right-hand controls and the window buttons.
 const CONTROLS_GAP: f32 = 8.0;
 /// Space either side of a menu's name in the menu bar.
 const MENU_PADDING: f32 = 10.0;
+/// egui's, in its `menu_style`.
+const EGUI_MENU_PADDING: f32 = 2.0;
 
 /// libadwaita's `--window-radius`, as shipped in Ubuntu's Yaru styles too.
 pub const WINDOW_RADIUS: u8 = 15;
@@ -334,14 +336,23 @@ impl<'a> TitleBar<'a> {
             (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let mut left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
-        if menu_bar && let Some(span) = span {
-            left_rect = egui::Rect::from_x_y_ranges(left_rect.x_range(), span);
+        let left_edge = left_rect.left();
+        if menu_bar {
+            // The first menu's name stays where egui's menu bar put it: the
+            // padding added to it falls before the edge, clipped off.
+            left_rect.min.x -= MENU_PADDING - EGUI_MENU_PADDING;
+            if let Some(span) = span {
+                left_rect = egui::Rect::from_x_y_ranges(left_rect.x_range(), span);
+            }
         }
         let mut left_ui = child(
             ui,
             left_rect,
             egui::Layout::left_to_right(egui::Align::Center),
         );
+        let mut clip = left_ui.clip_rect();
+        clip.min.x = clip.min.x.max(left_edge);
+        left_ui.set_clip_rect(clip);
         bar_controls(&mut left_ui, style);
         steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
