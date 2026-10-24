@@ -4,7 +4,8 @@ Date: 2026-10-24
 
 ## Status
 
-Accepted. The user found the Patina desktop's menus, then drawn as egui's context menus are,
+Accepted; the menu part superseded by [ADR-0023](0023-menus-are-egui-s-own-size.md),
+which keeps menus egui's own size. The user found the Patina desktop's menus, then drawn as egui's context menus are,
 too short, chose 24 px for an item, and asked that nothing clickable be smaller than 24×24;
 text that's only read can be any size. `patina::menu` is my design.
 

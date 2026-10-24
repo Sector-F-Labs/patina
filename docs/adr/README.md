@@ -63,7 +63,8 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0019](0019-kinetic-scrolling-on-a-touchpad.md) | A touchpad flick keeps scrolling after the fingers lift, through `patina::kinetic` | Proposed |
 | [0020](0020-ctrl-t-and-w-and-a-terminals-keys.md) | Tabs take Ctrl+T and Ctrl+W; a terminal takes them with Shift | Proposed |
 | [0021](0021-tabs-that-move-and-launchers.md) | Tabs can be dragged into another order, and some tabs can be launchers | Proposed |
-| [0022](0022-clickable-elements-are-at-least-24-px.md) | Clickable elements are at least 24 px, and menus' items 24 px high | Accepted |
+| [0022](0022-clickable-elements-are-at-least-24-px.md) | Clickable elements are at least 24 px, and menus' items 24 px high | Menus superseded by 0023 |
+| [0023](0023-menus-are-egui-s-own-size.md) | Menus are egui's own size, as Teleprinter's | Accepted |
 
 ## Decision Relationship
 
@@ -92,6 +93,7 @@ flowchart TD
     O --> P
     C --> R[0019: Kinetic scrolling on a touchpad]
     P --> T[0022: Clickable at least 24 px, menus 24 an item]
+    T --> U[0023: Menus are egui's own size]
 ```
 
 ## Revisit Triggers

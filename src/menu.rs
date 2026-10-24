@@ -1,23 +1,16 @@
-//! Menus as every Patina app draws them (ADR-0022): egui's menu style, its
-//! flat buttons lit under the pointer, with each item [`ITEM`] high, so no
-//! item is smaller than the 24×24 Patina keeps every clickable element to
-//! (`docs/design.md`).
+//! Menus as every Patina app draws them (ADR-0023): egui's own menu style,
+//! its flat buttons lit under the pointer, 18 px an item with 3 px between,
+//! as Teleprinter's File, Edit and View menus are.
 //!
-//! egui's `Response::context_menu` keeps its own style, so apps open theirs
-//! with [`context`]; a menu drawn some other way, as on the Patina desktop,
-//! takes [`style`].
+//! A context menu opened with [`context`] and a menu drawn some other way,
+//! as on the Patina desktop, with [`style`], look like the menus a menu bar
+//! opens. The style is Patina's to change in one place.
 
 use egui::{InnerResponse, Popup, Response, Style, Ui};
 
-/// The height of a menu's item, and the least a clickable element should
-/// be either way.
-pub const ITEM: f32 = 24.0;
-
-/// egui's menu style with Patina's item height. Checkboxes and radio buttons
-/// in the menu are as tall as its buttons.
+/// A menu's style: egui's, as its menu bars use.
 pub fn style(style: &mut Style) {
     egui::containers::menu::menu_style(style);
-    style.spacing.interact_size.y = ITEM;
 }
 
 /// The context menu `response` opens on a secondary click, as
@@ -31,7 +24,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_menu_item_is_24_high() {
+    fn a_menu_item_is_as_high_as_in_a_menu_bar() {
         let ctx = egui::Context::default();
         let mut height = 0.0;
         let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
@@ -40,6 +33,6 @@ mod tests {
                 height = ui.button("Open").rect.height();
             });
         });
-        assert_eq!(height, ITEM);
+        assert_eq!(height, egui::Style::default().spacing.interact_size.y);
     }
 }
