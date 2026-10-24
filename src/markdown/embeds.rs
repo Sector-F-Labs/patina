@@ -60,13 +60,19 @@ pub fn table(ui: &mut egui::Ui, table: &mut Table, id: Id, editable: bool) -> Em
                     };
                     // A &str shows the text, selectable, and edits nothing.
                     let mut shown = table.rows[r][c].as_str();
-                    let text: &mut dyn egui::TextBuffer = if editable { &mut table.rows[r][c] } else { &mut shown };
+                    let text: &mut dyn egui::TextBuffer = if editable {
+                        &mut table.rows[r][c]
+                    } else {
+                        &mut shown
+                    };
                     let mut edit = egui::TextEdit::singleline(text)
                         .id(id.with((r, c)))
                         .desired_width(CELL_WIDTH)
                         .horizontal_align(align);
                     if header {
-                        edit = edit.text_color(ui.visuals().strong_text_color()).hint_text("Heading");
+                        edit = edit
+                            .text_color(ui.visuals().strong_text_color())
+                            .hint_text("Heading");
                     }
                     let resp = ui.add_sized([CELL_WIDTH, ui.spacing().interact_size.y], edit);
                     out.changed |= resp.changed();
@@ -139,9 +145,12 @@ fn table_menu(ui: &mut egui::Ui, r: usize, c: usize, table: &Table) -> Option<Ta
     }
     ui.separator();
     ui.menu_button("Align Column", |ui| {
-        for (align, label) in
-            [(Align::None, "Default"), (Align::Left, "Left"), (Align::Center, "Centre"), (Align::Right, "Right")]
-        {
+        for (align, label) in [
+            (Align::None, "Default"),
+            (Align::Left, "Left"),
+            (Align::Center, "Centre"),
+            (Align::Right, "Right"),
+        ] {
             if ui.radio(table.align[c] == align, label).clicked() {
                 cmd = Some(TableCommand::Align(c, align));
             }
@@ -199,34 +208,57 @@ fn syntax_name(lang: &str) -> String {
 
 /// A code block; with `editable` off, its language is a label and its code
 /// can only be selected and copied.
-pub fn code(ui: &mut egui::Ui, lang: &mut String, code: &mut String, id: Id, editable: bool) -> EmbedResponse {
+pub fn code(
+    ui: &mut egui::Ui,
+    lang: &mut String,
+    code: &mut String,
+    id: Id,
+    editable: bool,
+) -> EmbedResponse {
     let mut out = EmbedResponse::default();
     let fill = ui.visuals().code_bg_color;
     egui::Frame::group(ui.style()).fill(fill).show(ui, |ui| {
         ui.horizontal(|ui| {
-            let shown = LANGUAGES.iter().find(|(tag, _)| tag == lang).map_or(lang.as_str(), |(_, name)| name);
+            let shown = LANGUAGES
+                .iter()
+                .find(|(tag, _)| tag == lang)
+                .map_or(lang.as_str(), |(_, name)| name);
             if !editable {
                 ui.label(RichText::new(shown).weak().small());
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.small_button("Copy").on_hover_text("Copy the code").clicked() {
+                    if ui
+                        .small_button("Copy")
+                        .on_hover_text("Copy the code")
+                        .clicked()
+                    {
                         ui.ctx().copy_text(code.clone());
                     }
                 });
                 return;
             }
-            egui::ComboBox::from_id_salt(id.with("lang")).selected_text(shown).show_ui(ui, |ui| {
-                for (tag, name) in LANGUAGES {
-                    if ui.selectable_label(lang == tag, *name).clicked() && lang != tag {
-                        *lang = tag.to_string();
-                        out.changed = true;
+            egui::ComboBox::from_id_salt(id.with("lang"))
+                .selected_text(shown)
+                .show_ui(ui, |ui| {
+                    for (tag, name) in LANGUAGES {
+                        if ui.selectable_label(lang == tag, *name).clicked() && lang != tag {
+                            *lang = tag.to_string();
+                            out.changed = true;
+                        }
                     }
-                }
-            });
+                });
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.small_button("Delete").on_hover_text("Delete this code block").clicked() {
+                if ui
+                    .small_button("Delete")
+                    .on_hover_text("Delete this code block")
+                    .clicked()
+                {
                     out.delete = true;
                 }
-                if ui.small_button("Copy").on_hover_text("Copy the code").clicked() {
+                if ui
+                    .small_button("Copy")
+                    .on_hover_text("Copy the code")
+                    .clicked()
+                {
                     ui.ctx().copy_text(code.clone());
                 }
             });
@@ -234,7 +266,13 @@ pub fn code(ui: &mut egui::Ui, lang: &mut String, code: &mut String, id: Id, edi
         let theme = CodeTheme::from_memory(ui.ctx(), ui.style());
         let language = syntax_name(lang);
         let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap: f32| {
-            let mut job = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
+            let mut job = syntax_highlighting::highlight(
+                ui.ctx(),
+                ui.style(),
+                &theme,
+                text.as_str(),
+                &language,
+            );
             job.wrap.max_width = wrap;
             ui.fonts_mut(|f| f.layout_job(job))
         };
@@ -256,14 +294,26 @@ pub fn code(ui: &mut egui::Ui, lang: &mut String, code: &mut String, id: Id, edi
 
 /// An image, with its description (the markdown alt text) editable
 /// under it. Relative sources are found from `dir`, the note's folder.
-pub fn image(ui: &mut egui::Ui, image: &mut Image, dir: Option<&Path>, id: Id, editable: bool) -> EmbedResponse {
+pub fn image(
+    ui: &mut egui::Ui,
+    image: &mut Image,
+    dir: Option<&Path>,
+    id: Id,
+    editable: bool,
+) -> EmbedResponse {
     let mut out = EmbedResponse::default();
     let uri = image_uri(&image.src, dir);
     let width = ui.available_width();
-    let missing = uri.strip_prefix("file://").is_some_and(|path| !Path::new(path).exists());
+    let missing = uri
+        .strip_prefix("file://")
+        .is_some_and(|path| !Path::new(path).exists());
     let shown = if missing {
         let text = RichText::new(format!("Image not found: {}", image.src)).weak();
-        egui::Frame::group(ui.style()).show(ui, |ui| ui.add(egui::Label::new(text).sense(egui::Sense::click()))).inner
+        egui::Frame::group(ui.style())
+            .show(ui, |ui| {
+                ui.add(egui::Label::new(text).sense(egui::Sense::click()))
+            })
+            .inner
     } else {
         ui.add(
             egui::Image::new(uri.clone())
@@ -274,7 +324,11 @@ pub fn image(ui: &mut egui::Ui, image: &mut Image, dir: Option<&Path>, id: Id, e
                 .sense(egui::Sense::click()),
         )
     };
-    let hint = if image.title.is_empty() { image.src.clone() } else { format!("{}\n{}", image.title, image.src) };
+    let hint = if image.title.is_empty() {
+        image.src.clone()
+    } else {
+        format!("{}\n{}", image.title, image.src)
+    };
     shown.on_hover_text(hint).context_menu(|ui| {
         if ui.button("Open Image").clicked() {
             // A local file in the image viewer, not the web browser.
@@ -345,7 +399,11 @@ pub fn mark(
                 piece.leading_space = 0.0;
             }
             if let Some(i) = marks.iter().position(|m| m.start <= start && end <= m.end) {
-                piece.format.background = if Some(i) == current { current_colour } else { colour };
+                piece.format.background = if Some(i) == current {
+                    current_colour
+                } else {
+                    colour
+                };
             }
             sections.push(piece);
             start = end;
@@ -375,16 +433,27 @@ pub fn code_file(
     let selection = ui.visuals().selection.bg_fill;
     let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, _wrap: f32| {
         // Code isn't wrapped: lines keep their shape, and scroll sideways.
-        let mut job = syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
-        mark(&mut job, marks, current, selection.gamma_multiply(0.35), selection);
+        let mut job =
+            syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
+        mark(
+            &mut job,
+            marks,
+            current,
+            selection.gamma_multiply(0.35),
+            selection,
+        );
         ui.fonts_mut(|f| f.layout_job(job))
     };
     let mut found = None;
     ui.horizontal_top(|ui| {
         ui.spacing_mut().item_spacing.x = 16.0;
         ui.add(
-            egui::Label::new(RichText::new(numbers).monospace().color(ui.visuals().weak_text_color()))
-                .selectable(false),
+            egui::Label::new(
+                RichText::new(numbers)
+                    .monospace()
+                    .color(ui.visuals().weak_text_color()),
+            )
+            .selectable(false),
         );
         let mut shown = text;
         let output = egui::TextEdit::multiline(&mut shown)
@@ -397,7 +466,10 @@ pub fn code_file(
             .show(ui);
         found = current.and_then(|i| marks.get(i)).map(|m| {
             let chars = text[..m.start].chars().count();
-            output.galley.pos_from_cursor(egui::text::CCursor::new(chars)).translate(output.galley_pos.to_vec2())
+            output
+                .galley
+                .pos_from_cursor(egui::text::CCursor::new(chars))
+                .translate(output.galley_pos.to_vec2())
         });
     });
     found
@@ -468,9 +540,24 @@ mod tests {
         job.append("hello world", 0.0, egui::TextFormat::default());
         let (weak, strong) = (egui::Color32::GRAY, egui::Color32::RED);
         mark(&mut job, &[0..2, 6..11], Some(1), weak, strong);
-        let pieces: Vec<(std::ops::Range<usize>, egui::Color32)> =
-            job.sections.iter().map(|s| (s.byte_range.start.0..s.byte_range.end.0, s.format.background)).collect();
-        assert_eq!(pieces, [(0..2, weak), (2..6, egui::Color32::TRANSPARENT), (6..11, strong)]);
+        let pieces: Vec<(std::ops::Range<usize>, egui::Color32)> = job
+            .sections
+            .iter()
+            .map(|s| {
+                (
+                    s.byte_range.start.0..s.byte_range.end.0,
+                    s.format.background,
+                )
+            })
+            .collect();
+        assert_eq!(
+            pieces,
+            [
+                (0..2, weak),
+                (2..6, egui::Color32::TRANSPARENT),
+                (6..11, strong)
+            ]
+        );
     }
 
     #[test]
@@ -478,7 +565,14 @@ mod tests {
         let dir = Path::new("/notes");
         assert_eq!(image_uri("a%20b.png", Some(dir)), "file:///notes/a b.png");
         assert_eq!(image_uri("/x.png", Some(dir)), "file:///x.png");
-        assert_eq!(image_uri("https://e.com/i.png", Some(dir)), "https://e.com/i.png");
-        assert_eq!(image_uri("50%.png", Some(dir)), "file:///notes/50%.png", "a bad escape is kept");
+        assert_eq!(
+            image_uri("https://e.com/i.png", Some(dir)),
+            "https://e.com/i.png"
+        );
+        assert_eq!(
+            image_uri("50%.png", Some(dir)),
+            "file:///notes/50%.png",
+            "a bad escape is kept"
+        );
     }
 }

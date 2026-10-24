@@ -63,6 +63,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0019](0019-kinetic-scrolling-on-a-touchpad.md) | A touchpad flick keeps scrolling after the fingers lift, through `patina::kinetic` | Proposed |
 | [0020](0020-ctrl-t-and-w-and-a-terminals-keys.md) | Tabs take Ctrl+T and Ctrl+W; a terminal takes them with Shift | Proposed |
 | [0021](0021-tabs-that-move-and-launchers.md) | Tabs can be dragged into another order, and some tabs can be launchers | Proposed |
+| [0022](0022-clickable-elements-are-at-least-24-px.md) | Clickable elements are at least 24 px, and menus' items 24 px high | Accepted |
 
 ## Decision Relationship
 
@@ -90,6 +91,7 @@ flowchart TD
     K --> P[0017: Skin menu holds only controls]
     O --> P
     C --> R[0019: Kinetic scrolling on a touchpad]
+    P --> T[0022: Clickable at least 24 px, menus 24 an item]
 ```
 
 ## Revisit Triggers

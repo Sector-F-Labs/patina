@@ -9,6 +9,7 @@
 //! - [`tabs`]: tabs in the title bar, in place of the window title.
 //! - [`tree`]: a lazily loaded sidebar folder tree.
 //! - [`ime`]: stops the input method keeping an idle window repainting.
+//! - [`menu`]: menus, their items 24 high, and context menus in that style.
 //! - [`kinetic`]: a touchpad flick keeps scrolling after the fingers lift.
 //! - [`open`]: opens files and folders in the desktop's apps, not the browser.
 //! - [`markdown`] (feature `markdown`): markdown shown and edited as Notebook
@@ -16,10 +17,11 @@
 
 pub mod appearance;
 pub mod frame;
-#[cfg(feature = "markdown")]
-pub mod markdown;
 pub mod ime;
 pub mod kinetic;
+#[cfg(feature = "markdown")]
+pub mod markdown;
+pub mod menu;
 pub mod open;
 pub mod skin;
 pub mod tabs;

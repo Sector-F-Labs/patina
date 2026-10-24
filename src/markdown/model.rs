@@ -50,7 +50,10 @@ pub struct Table {
 
 impl Table {
     pub fn new(columns: usize, body_rows: usize) -> Self {
-        Table { align: vec![Align::None; columns], rows: vec![vec![String::new(); columns]; body_rows + 1] }
+        Table {
+            align: vec![Align::None; columns],
+            rows: vec![vec![String::new(); columns]; body_rows + 1],
+        }
     }
 
     pub fn columns(&self) -> usize {
@@ -93,7 +96,10 @@ pub struct Line {
 
 impl Line {
     fn new(block: Block) -> Self {
-        Line { block, spans: Vec::new() }
+        Line {
+            block,
+            spans: Vec::new(),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -134,7 +140,10 @@ fn matching_end(events: &Events, start: usize) -> usize {
 }
 
 fn is_inline_tag(tag: &Tag) -> bool {
-    matches!(tag, Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link { .. } | Tag::Image { .. })
+    matches!(
+        tag,
+        Tag::Emphasis | Tag::Strong | Tag::Strikethrough | Tag::Link { .. } | Tag::Image { .. }
+    )
 }
 
 /// Read a table starting at `start` (a `Start(Table)` event).
@@ -197,11 +206,20 @@ fn table_markdown(table: &Table) -> String {
 /// The image filling the paragraph that starts at `start`, if that's all
 /// it holds, and the index of the paragraph's end.
 fn lone_image(events: &Events, start: usize) -> Option<(Image, usize)> {
-    let Some((Event::Start(Tag::Image { dest_url, title, .. }), _)) = events.get(start + 1) else {
+    let Some((
+        Event::Start(Tag::Image {
+            dest_url, title, ..
+        }),
+        _,
+    )) = events.get(start + 1)
+    else {
         return None;
     };
     let end = matching_end(events, start + 1);
-    if !matches!(events.get(end + 1), Some((Event::End(TagEnd::Paragraph), _))) {
+    if !matches!(
+        events.get(end + 1),
+        Some((Event::End(TagEnd::Paragraph), _))
+    ) {
         return None;
     }
     // The description as plain text: any styling in it is dropped.
@@ -213,7 +231,14 @@ fn lone_image(events: &Events, start: usize) -> Option<(Image, usize)> {
             _ => None,
         })
         .collect();
-    Some((Image { alt, src: dest_url.to_string(), title: title.to_string() }, end + 1))
+    Some((
+        Image {
+            alt,
+            src: dest_url.to_string(),
+            title: title.to_string(),
+        },
+        end + 1,
+    ))
 }
 
 fn image_markdown(image: &Image) -> String {
@@ -221,7 +246,11 @@ fn image_markdown(image: &Image) -> String {
         "" => String::new(),
         t => format!(" \"{}\"", t.replace('"', "\\\"")),
     };
-    format!("![{}]({}{title})", escape(&image.alt), link_dest(&image.src))
+    format!(
+        "![{}]({}{title})",
+        escape(&image.alt),
+        link_dest(&image.src)
+    )
 }
 
 /// A quote the rich editor can represent: paragraphs only.
@@ -276,7 +305,11 @@ struct Importer<'a> {
 
 impl<'a> Importer<'a> {
     fn context_block(&self) -> Block {
-        if self.quotes > 0 { Block::Quote } else { Block::Paragraph }
+        if self.quotes > 0 {
+            Block::Quote
+        } else {
+            Block::Paragraph
+        }
     }
 
     fn start_line(&mut self, block: Block) {
@@ -306,7 +339,10 @@ impl<'a> Importer<'a> {
         let line = self.current.as_mut().unwrap();
         match line.spans.last_mut() {
             Some(last) if last.styles == styles => last.text.push_str(text),
-            _ => line.spans.push(Span { text: text.to_string(), styles }),
+            _ => line.spans.push(Span {
+                text: text.to_string(),
+                styles,
+            }),
         }
     }
 
@@ -319,7 +355,10 @@ impl<'a> Importer<'a> {
         }
         for l in text.split('\n') {
             let mut line = Line::new(Block::Raw);
-            line.spans.push(Span { text: l.trim_end_matches('\r').to_string(), styles: vec![] });
+            line.spans.push(Span {
+                text: l.trim_end_matches('\r').to_string(),
+                styles: vec![],
+            });
             self.push(line);
         }
     }
@@ -342,7 +381,11 @@ pub fn parse(src: &str) -> Vec<Line> {
         let (event, range) = &events[i];
         match event {
             Event::Start(tag) => match tag {
-                Tag::Paragraph if im.lists.is_empty() && im.quotes == 0 && lone_image(&events, i).is_some() => {
+                Tag::Paragraph
+                    if im.lists.is_empty()
+                        && im.quotes == 0
+                        && lone_image(&events, i).is_some() =>
+                {
                     let (image, end) = lone_image(&events, i).expect("checked above");
                     im.finish_line();
                     im.push(Line::new(Block::Image(image)));
@@ -384,7 +427,10 @@ pub fn parse(src: &str) -> Vec<Line> {
                         let code = code.strip_suffix('\n').unwrap_or(&code);
                         for l in code.split('\n') {
                             let mut line = Line::new(Block::Code(lang.clone()));
-                            line.spans.push(Span { text: l.to_string(), styles: vec![] });
+                            line.spans.push(Span {
+                                text: l.to_string(),
+                                styles: vec![],
+                            });
                             im.push(line);
                         }
                     } else {
@@ -436,7 +482,13 @@ pub fn parse(src: &str) -> Vec<Line> {
             },
             Event::End(tag) => match tag {
                 TagEnd::Paragraph => {
-                    if !matches!(&im.current, Some(Line { block: Block::Item { .. }, .. })) {
+                    if !matches!(
+                        &im.current,
+                        Some(Line {
+                            block: Block::Item { .. },
+                            ..
+                        })
+                    ) {
                         im.finish_line();
                     }
                 }
@@ -459,7 +511,10 @@ pub fn parse(src: &str) -> Vec<Line> {
             Event::SoftBreak => im.text(" ", None),
             Event::HardBreak => {
                 let block = match &im.current {
-                    Some(Line { block: b @ (Block::Paragraph | Block::Quote), .. }) => Some(b.clone()),
+                    Some(Line {
+                        block: b @ (Block::Paragraph | Block::Quote),
+                        ..
+                    }) => Some(b.clone()),
                     _ => None,
                 };
                 match block {
@@ -468,7 +523,11 @@ pub fn parse(src: &str) -> Vec<Line> {
                 }
             }
             Event::TaskListMarker(checked) => {
-                if let Some(Line { block: Block::Item { kind, .. }, .. }) = &mut im.current {
+                if let Some(Line {
+                    block: Block::Item { kind, .. },
+                    ..
+                }) = &mut im.current
+                {
                     *kind = ListKind::Task(*checked);
                 }
             }
@@ -476,7 +535,9 @@ pub fn parse(src: &str) -> Vec<Line> {
             Event::Html(_) | Event::InlineHtml(_) | Event::FootnoteReference(_) => {
                 im.text(&src[range.clone()], Some(Inline::Raw))
             }
-            Event::InlineMath(_) | Event::DisplayMath(_) => im.text(&src[range.clone()], Some(Inline::Raw)),
+            Event::InlineMath(_) | Event::DisplayMath(_) => {
+                im.text(&src[range.clone()], Some(Inline::Raw))
+            }
         }
         i += 1;
     }
@@ -500,7 +561,10 @@ fn escape(text: &str) -> String {
         let next = chars.get(i + 1).copied();
         let needs = match c {
             '\\' | '*' | '`' | '[' | ']' | '~' => true,
-            '_' => !(prev.is_some_and(char::is_alphanumeric) && next.is_some_and(char::is_alphanumeric)),
+            '_' => {
+                !(prev.is_some_and(char::is_alphanumeric)
+                    && next.is_some_and(char::is_alphanumeric))
+            }
             '<' => next.is_some_and(|n| n.is_ascii_alphabetic() || matches!(n, '/' | '!' | '?')),
             '&' => next.is_some_and(|n| n.is_ascii_alphanumeric() || n == '#'),
             _ => false,
@@ -521,10 +585,17 @@ fn escape_line_start(text: &str) -> String {
     let space_or_end = second.is_none_or(char::is_whitespace);
     let all_rule = text.len() >= 3
         && text.chars().all(|c| matches!(c, '-' | '*' | '_' | ' '))
-        && text.chars().filter(|c| !c.is_whitespace()).collect::<std::collections::HashSet<_>>().len() == 1;
+        && text
+            .chars()
+            .filter(|c| !c.is_whitespace())
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+            == 1;
 
     match first {
-        Some('#') if space_or_end || text.trim_end().chars().all(|c| c == '#') => format!("\\{text}"),
+        Some('#') if space_or_end || text.trim_end().chars().all(|c| c == '#') => {
+            format!("\\{text}")
+        }
         Some('>') => format!("\\{text}"),
         Some('-' | '+') if space_or_end || all_rule => format!("\\{text}"),
         _ if text.starts_with("\\*") && all_rule => text.to_string(),
@@ -533,7 +604,10 @@ fn escape_line_start(text: &str) -> String {
             let digits = text.chars().take_while(char::is_ascii_digit).count();
             let after = text[digits..].chars().next();
             let after2 = text[digits..].chars().nth(1);
-            if (1..=9).contains(&digits) && matches!(after, Some('.' | ')')) && after2.is_none_or(char::is_whitespace) {
+            if (1..=9).contains(&digits)
+                && matches!(after, Some('.' | ')'))
+                && after2.is_none_or(char::is_whitespace)
+            {
                 format!("{}\\{}", &text[..digits], &text[digits..])
             } else {
                 text.to_string()
@@ -546,11 +620,19 @@ fn code_span(text: &str) -> String {
     let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
     let fence = "`".repeat(longest + 1);
     let pad = text.starts_with('`') || text.ends_with('`');
-    if pad { format!("{fence} {text} {fence}") } else { format!("{fence}{text}{fence}") }
+    if pad {
+        format!("{fence} {text} {fence}")
+    } else {
+        format!("{fence}{text}{fence}")
+    }
 }
 
 fn link_dest(url: &str) -> String {
-    if url.contains([' ', '(', ')']) { format!("<{url}>") } else { url.to_string() }
+    if url.contains([' ', '(', ')']) {
+        format!("<{url}>")
+    } else {
+        url.to_string()
+    }
 }
 
 fn opener(style: &Inline) -> &'static str {
@@ -589,8 +671,12 @@ pub fn inline_markdown(spans: &[Span]) -> String {
     let mut open: Vec<Inline> = Vec::new();
 
     for span in spans.iter().filter(|s| !s.text.is_empty()) {
-        let wanted: Vec<Inline> =
-            span.styles.iter().filter(|s| !matches!(s, Inline::Code | Inline::Raw)).cloned().collect();
+        let wanted: Vec<Inline> = span
+            .styles
+            .iter()
+            .filter(|s| !matches!(s, Inline::Code | Inline::Raw))
+            .cloned()
+            .collect();
 
         let keep = open.iter().take_while(|s| wanted.contains(s)).count();
         let closing = open.split_off(keep);
@@ -645,7 +731,13 @@ pub fn to_markdown(lines: &[Line]) -> String {
             Block::Code(lang) => {
                 let mut body = Vec::new();
                 while i < lines.len() && lines[i].block == line.block {
-                    body.push(lines[i].spans.iter().map(|s| s.text.as_str()).collect::<String>());
+                    body.push(
+                        lines[i]
+                            .spans
+                            .iter()
+                            .map(|s| s.text.as_str())
+                            .collect::<String>(),
+                    );
                     i += 1;
                 }
                 let body = body.join("\n");
@@ -675,7 +767,11 @@ pub fn to_markdown(lines: &[Line]) -> String {
                 let mut numbers: Vec<Option<u64>> = Vec::new();
                 let family = |k: &ListKind| std::mem::discriminant(k);
                 let mut top: Option<std::mem::Discriminant<ListKind>> = None;
-                while let Some(Line { block: Block::Item { kind, depth }, spans }) = lines.get(i) {
+                while let Some(Line {
+                    block: Block::Item { kind, depth },
+                    spans,
+                }) = lines.get(i)
+                {
                     let depth = (*depth as usize).min(widths.len());
                     if depth == 0 {
                         // A different kind of top-level item starts a new list.
@@ -703,9 +799,17 @@ pub fn to_markdown(lines: &[Line]) -> String {
                         numbers[depth] = None;
                     }
                     let indent: usize = widths.iter().sum();
-                    let content = if matches!(kind, ListKind::Task(_)) { 2 } else { marker.len() };
+                    let content = if matches!(kind, ListKind::Task(_)) {
+                        2
+                    } else {
+                        marker.len()
+                    };
                     let text = inline_markdown(spans);
-                    out.push(format!("{}{}{}", " ".repeat(indent), marker, text.trim_start()).trim_end().to_string());
+                    out.push(
+                        format!("{}{}{}", " ".repeat(indent), marker, text.trim_start())
+                            .trim_end()
+                            .to_string(),
+                    );
                     widths.push(content);
                     i += 1;
                 }
@@ -749,17 +853,36 @@ mod tests {
         let lines = parse("Before\n\n![A cat](pics/cat%20one.png \"Tabby\")\n\nAfter\n");
         assert_eq!(
             lines[1].block,
-            Block::Image(Image { alt: "A cat".into(), src: "pics/cat%20one.png".into(), title: "Tabby".into() })
+            Block::Image(Image {
+                alt: "A cat".into(),
+                src: "pics/cat%20one.png".into(),
+                title: "Tabby".into()
+            })
         );
-        assert_eq!(roundtrip("![A cat](pics/cat.png \"Tabby\")\n"), "![A cat](pics/cat.png \"Tabby\")\n");
-        assert_eq!(roundtrip("![a \\[b\\]](<x y.png>)\n"), "![a \\[b\\]](<x y.png>)\n");
+        assert_eq!(
+            roundtrip("![A cat](pics/cat.png \"Tabby\")\n"),
+            "![A cat](pics/cat.png \"Tabby\")\n"
+        );
+        assert_eq!(
+            roundtrip("![a \\[b\\]](<x y.png>)\n"),
+            "![a \\[b\\]](<x y.png>)\n"
+        );
         assert_eq!(roundtrip("![](x.png)\n"), "![](x.png)\n");
     }
 
     #[test]
     fn images_inside_text_or_lists_stay_raw() {
-        for src in ["Look: ![cat](cat.png) here\n", "- ![cat](cat.png)\n", "> ![cat](cat.png)\n"] {
-            assert!(!parse(src).iter().any(|l| matches!(l.block, Block::Image(_))), "{src}");
+        for src in [
+            "Look: ![cat](cat.png) here\n",
+            "- ![cat](cat.png)\n",
+            "> ![cat](cat.png)\n",
+        ] {
+            assert!(
+                !parse(src)
+                    .iter()
+                    .any(|l| matches!(l.block, Block::Image(_))),
+                "{src}"
+            );
             assert_eq!(roundtrip(src), src);
         }
     }
@@ -800,7 +923,10 @@ mod tests {
     fn plain_text_is_escaped() {
         let lines = vec![Line {
             block: Block::Paragraph,
-            spans: vec![Span { text: "# not a heading *really*".into(), styles: vec![] }],
+            spans: vec![Span {
+                text: "# not a heading *really*".into(),
+                styles: vec![],
+            }],
         }];
         let md = to_markdown(&lines);
         assert_eq!(parse(&md), lines);
@@ -809,8 +935,14 @@ mod tests {
     #[test]
     fn emphasis_moves_trailing_space_outside() {
         let spans = vec![
-            Span { text: "bold ".into(), styles: vec![Inline::Bold] },
-            Span { text: "plain".into(), styles: vec![] },
+            Span {
+                text: "bold ".into(),
+                styles: vec![Inline::Bold],
+            },
+            Span {
+                text: "plain".into(),
+                styles: vec![],
+            },
         ];
         assert_eq!(inline_markdown(&spans), "**bold** plain");
     }

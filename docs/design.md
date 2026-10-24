@@ -96,6 +96,16 @@ Implemented by `patina::frame`.
     there, e.g. a sidebar on the left and the central panel on the right, or a status bar
     across the bottom holding both.
 
+## Sizes and menus
+
+- **Nothing clickable is smaller than 24×24 px**
+  ([ADR-0022](adr/0022-clickable-elements-are-at-least-24-px.md)): buttons, menu items, checkboxes,
+  icons that act. Text that's only read can be any size. Where egui's default is smaller (its
+  buttons are 18 px high), give the widget more room rather than shrink the target.
+- **Menus are egui's, 24 px an item:** `patina::menu::style`, egui's menu style with
+  `menu::ITEM` high items. Open a context menu with `patina::menu::context(&response, ...)`, not
+  `response.context_menu`, which keeps egui's 18 px.
+
 ## Skins
 
 Implemented by `patina::skin`. The format is documented in [skinning.md](skinning.md).
@@ -131,6 +141,7 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
 | `appearance` | Follow the desktop's light/dark setting (XDG portal) | UnAmp, Photograph |
 | `skin` | Suite skin format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
 | `tree` | Lazily loaded sidebar folder tree | UnAmp |
+| `menu` | Menus' style, 24 px items, and context menus in it | Files, the Patina desktop |
 
 Run `make gallery` to see each one. A component belongs in Patina when a second app wants it.
 It may use only std, egui and small helper crates, never an app's own types

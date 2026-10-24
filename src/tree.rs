@@ -126,7 +126,9 @@ impl FolderTree {
         let label = format!("{icon} {name}");
 
         let header = |ui: &mut egui::Ui, clicked: &mut Option<PathBuf>| {
-            let resp = ui.selectable_label(is_current, &label).on_hover_text(path.display().to_string());
+            let resp = ui
+                .selectable_label(is_current, &label)
+                .on_hover_text(path.display().to_string());
             if resp.clicked() {
                 *clicked = Some(path.to_path_buf());
             }
@@ -146,22 +148,20 @@ impl FolderTree {
         }
 
         let header_resp = state.show_header(ui, |ui| header(ui, clicked));
-        let (_, header_out, _) = header_resp.body(|ui| {
-            match self.children.get(path) {
-                None => {
-                    self.request(path, ui.ctx());
-                    ui.spinner();
-                }
-                Some(Children::Loading) => {
-                    ui.spinner();
-                }
-                Some(Children::Failed(e)) => {
-                    ui.label(egui::RichText::new(e.as_str()).weak().small());
-                }
-                Some(Children::Loaded(list)) => {
-                    for (child, child_name) in list.clone() {
-                        self.node(ui, &child, &child_name, current, false, clicked);
-                    }
+        let (_, header_out, _) = header_resp.body(|ui| match self.children.get(path) {
+            None => {
+                self.request(path, ui.ctx());
+                ui.spinner();
+            }
+            Some(Children::Loading) => {
+                ui.spinner();
+            }
+            Some(Children::Failed(e)) => {
+                ui.label(egui::RichText::new(e.as_str()).weak().small());
+            }
+            Some(Children::Loaded(list)) => {
+                for (child, child_name) in list.clone() {
+                    self.node(ui, &child, &child_name, current, false, clicked);
                 }
             }
         });
@@ -215,7 +215,11 @@ mod tests {
             std::fs::create_dir_all(dir.join(d)).unwrap();
         }
         std::fs::write(dir.join("song.mp3"), b"").unwrap();
-        let names: Vec<String> = list_subfolders(&dir).unwrap().into_iter().map(|(_, n)| n).collect();
+        let names: Vec<String> = list_subfolders(&dir)
+            .unwrap()
+            .into_iter()
+            .map(|(_, n)| n)
+            .collect();
         assert_eq!(names, ["Alpha", "beta", "gamma"]);
         let _ = std::fs::remove_dir_all(&dir);
     }

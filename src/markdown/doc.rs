@@ -23,7 +23,10 @@ pub enum Para {
 
 impl Para {
     pub fn text(block: Block) -> Self {
-        Para::Text(Line { block, spans: Vec::new() })
+        Para::Text(Line {
+            block,
+            spans: Vec::new(),
+        })
     }
 
     pub fn as_text(&self) -> Option<&Line> {
@@ -84,13 +87,22 @@ pub fn to_lines(paras: &[Para]) -> Vec<Line> {
     for para in paras {
         match para {
             Para::Text(line) => lines.push(line.clone()),
-            Para::Table(table) => lines.push(Line { block: Block::Table(table.clone()), spans: Vec::new() }),
-            Para::Image(image) => lines.push(Line { block: Block::Image(image.clone()), spans: Vec::new() }),
+            Para::Table(table) => lines.push(Line {
+                block: Block::Table(table.clone()),
+                spans: Vec::new(),
+            }),
+            Para::Image(image) => lines.push(Line {
+                block: Block::Image(image.clone()),
+                spans: Vec::new(),
+            }),
             Para::Code { lang, code } => {
                 for l in code.split('\n') {
                     lines.push(Line {
                         block: Block::Code(lang.clone()),
-                        spans: vec![Span { text: l.to_string(), styles: Vec::new() }],
+                        spans: vec![Span {
+                            text: l.to_string(),
+                            styles: Vec::new(),
+                        }],
                     });
                 }
             }
@@ -181,7 +193,13 @@ pub fn styles_at(spans: &[Span], col: usize) -> Vec<Inline> {
 
 pub fn insert(spans: &mut Vec<Span>, col: usize, text: &str, styles: &[Inline]) {
     let i = split_at(spans, col);
-    spans.insert(i, Span { text: text.to_string(), styles: styles.to_vec() });
+    spans.insert(
+        i,
+        Span {
+            text: text.to_string(),
+            styles: styles.to_vec(),
+        },
+    );
     tidy(spans);
 }
 
@@ -281,7 +299,8 @@ pub fn word_at(text: &str, col: usize) -> Range<usize> {
     let chars: Vec<char> = text.chars().collect();
     let is_word = |c: char| c.is_alphanumeric() || c == '_';
     let col = col.min(chars.len());
-    let on_word = chars.get(col).is_some_and(|c| is_word(*c)) || (col > 0 && is_word(chars[col - 1]));
+    let on_word =
+        chars.get(col).is_some_and(|c| is_word(*c)) || (col > 0 && is_word(chars[col - 1]));
     if !on_word {
         return col..(col + 1).min(chars.len());
     }
@@ -325,7 +344,10 @@ mod tests {
     use crate::markdown::model::{self, ListKind};
 
     fn span(text: &str, styles: &[Inline]) -> Span {
-        Span { text: text.into(), styles: styles.to_vec() }
+        Span {
+            text: text.into(),
+            styles: styles.to_vec(),
+        }
     }
 
     fn md(paras: &[Para]) -> String {
@@ -336,8 +358,17 @@ mod tests {
     fn code_lines_become_one_paragraph_and_back() {
         let src = "Intro\n\n```rust\nfn a() {}\n\nfn b() {}\n```\n";
         let paras = from_lines(model::parse(src));
-        assert_eq!(paras[1], Para::Code { lang: "rust".into(), code: "fn a() {}\n\nfn b() {}".into() });
-        assert!(matches!(paras.last(), Some(Para::Text(_))), "ends in a text paragraph");
+        assert_eq!(
+            paras[1],
+            Para::Code {
+                lang: "rust".into(),
+                code: "fn a() {}\n\nfn b() {}".into()
+            }
+        );
+        assert!(
+            matches!(paras.last(), Some(Para::Text(_))),
+            "ends in a text paragraph"
+        );
         assert_eq!(md(&paras), src);
     }
 
@@ -352,7 +383,11 @@ mod tests {
 
     #[test]
     fn delete_across_spans() {
-        let mut spans = vec![span("ab", &[]), span("cd", &[Inline::Bold]), span("ef", &[])];
+        let mut spans = vec![
+            span("ab", &[]),
+            span("cd", &[Inline::Bold]),
+            span("ef", &[]),
+        ];
         delete(&mut spans, 1..5);
         assert_eq!(spans, vec![span("af", &[])]);
     }
@@ -368,7 +403,14 @@ mod tests {
     fn toggling_a_style_over_part_of_a_span() {
         let mut spans = vec![span("one two three", &[])];
         set_style(&mut spans, 4..7, &Inline::Bold, true);
-        assert_eq!(spans, vec![span("one ", &[]), span("two", &[Inline::Bold]), span(" three", &[])]);
+        assert_eq!(
+            spans,
+            vec![
+                span("one ", &[]),
+                span("two", &[Inline::Bold]),
+                span(" three", &[])
+            ]
+        );
         assert!(all_have(&spans, 4..7, &Inline::Bold));
         assert!(!all_have(&spans, 3..7, &Inline::Bold));
         set_style(&mut spans, 0..13, &Inline::Bold, false);
@@ -377,7 +419,10 @@ mod tests {
 
     #[test]
     fn typing_continues_the_previous_style_but_not_links() {
-        let spans = vec![span("bold", &[Inline::Bold]), span("link", &[Inline::Link("u".into())])];
+        let spans = vec![
+            span("bold", &[Inline::Bold]),
+            span("link", &[Inline::Link("u".into())]),
+        ];
         assert_eq!(styles_at(&spans, 4), vec![Inline::Bold]);
         assert_eq!(styles_at(&spans, 0), vec![Inline::Bold]);
         assert!(styles_at(&spans, 8).is_empty());
@@ -386,7 +431,10 @@ mod tests {
     #[test]
     fn split_and_slice() {
         let mut spans = vec![span("ab", &[]), span("cd", &[Inline::Italic])];
-        assert_eq!(slice(&spans, 1..3), vec![span("b", &[]), span("c", &[Inline::Italic])]);
+        assert_eq!(
+            slice(&spans, 1..3),
+            vec![span("b", &[]), span("c", &[Inline::Italic])]
+        );
         let tail = split_off(&mut spans, 3);
         assert_eq!(spans, vec![span("ab", &[]), span("c", &[Inline::Italic])]);
         assert_eq!(tail, vec![span("d", &[Inline::Italic])]);
@@ -402,7 +450,16 @@ mod tests {
     #[test]
     fn tasks_survive_the_round_trip() {
         let paras = from_lines(model::parse("- [ ] todo\n- [x] done\n"));
-        assert!(matches!(&paras[0], Para::Text(Line { block: Block::Item { kind: ListKind::Task(false), .. }, .. })));
+        assert!(matches!(
+            &paras[0],
+            Para::Text(Line {
+                block: Block::Item {
+                    kind: ListKind::Task(false),
+                    ..
+                },
+                ..
+            })
+        ));
         assert_eq!(md(&paras), "- [ ] todo\n- [x] done\n");
     }
 }

@@ -27,10 +27,16 @@ pub const FORMAT: u32 = 1;
 
 /// Skins built into Patina, as (file name, contents), offered by every app.
 pub const BUILT_IN: &[(&str, &str)] = &[
-    ("dark-orange.toml", include_str!("../skins/dark-orange.toml")),
+    (
+        "dark-orange.toml",
+        include_str!("../skins/dark-orange.toml"),
+    ),
     ("calendar.toml", include_str!("../skins/calendar.toml")),
     ("notebook.toml", include_str!("../skins/notebook.toml")),
-    ("steam-classic.toml", include_str!("../skins/steam-classic.toml")),
+    (
+        "steam-classic.toml",
+        include_str!("../skins/steam-classic.toml"),
+    ),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -138,9 +144,11 @@ pub struct Hex(pub Color32);
 impl<'de> Deserialize<'de> for Hex {
     fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let s = String::deserialize(d)?;
-        parse_hex(&s)
-            .map(Hex)
-            .ok_or_else(|| serde::de::Error::custom(format!("invalid colour {s:?}, expected #RRGGBB or #RRGGBBAA")))
+        parse_hex(&s).map(Hex).ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "invalid colour {s:?}, expected #RRGGBB or #RRGGBBAA"
+            ))
+        })
     }
 }
 
@@ -149,7 +157,12 @@ fn parse_hex(s: &str) -> Option<Color32> {
     let byte = |i: usize| u8::from_str_radix(hex.get(i..i + 2)?, 16).ok();
     match hex.len() {
         6 => Some(Color32::from_rgb(byte(0)?, byte(2)?, byte(4)?)),
-        8 => Some(Color32::from_rgba_unmultiplied(byte(0)?, byte(2)?, byte(4)?, byte(6)?)),
+        8 => Some(Color32::from_rgba_unmultiplied(
+            byte(0)?,
+            byte(2)?,
+            byte(4)?,
+            byte(6)?,
+        )),
         _ => None,
     }
 }
@@ -201,7 +214,10 @@ impl Skin {
     /// The app's own `[app.<name>]` section, and warnings for keys `T`
     /// doesn't know. A missing section is `T::default()`; a bad value is an
     /// error.
-    pub fn app_section<T: DeserializeOwned + Default>(&self, name: &str) -> Result<(T, Vec<String>), String> {
+    pub fn app_section<T: DeserializeOwned + Default>(
+        &self,
+        name: &str,
+    ) -> Result<(T, Vec<String>), String> {
         match self.app.get(name) {
             Some(value) => deserialize(value.clone(), &format!("app.{name}.")),
             None => Ok((T::default(), Vec::new())),
@@ -215,7 +231,13 @@ impl Skin {
         let Some(base) = self.base else {
             ctx.set_theme(ThemePreference::System);
             for slot in [EguiTheme::Dark, EguiTheme::Light] {
-                ctx.set_style_of(slot, egui::Style { visuals: slot.default_visuals(), ..Default::default() });
+                ctx.set_style_of(
+                    slot,
+                    egui::Style {
+                        visuals: slot.default_visuals(),
+                        ..Default::default()
+                    },
+                );
             }
             return;
         };
@@ -226,7 +248,13 @@ impl Skin {
         let visuals = self.visuals(theme.default_visuals());
         ctx.set_theme(theme);
         for slot in [EguiTheme::Dark, EguiTheme::Light] {
-            ctx.set_style_of(slot, egui::Style { visuals: visuals.clone(), ..Default::default() });
+            ctx.set_style_of(
+                slot,
+                egui::Style {
+                    visuals: visuals.clone(),
+                    ..Default::default()
+                },
+            );
         }
     }
 
@@ -343,7 +371,10 @@ impl Skin {
             title_bar: or(w.title_bar, base.title_bar),
             title_text: or(w.title_text, base.title_text),
             border: or(w.border, base.border),
-            radius: w.corner_radius.or(self.corner_radius).unwrap_or(WINDOW_RADIUS),
+            radius: w
+                .corner_radius
+                .or(self.corner_radius)
+                .unwrap_or(WINDOW_RADIUS),
             controls: crate::frame::WindowControlColors {
                 icon: or(wc.icon, base.controls.icon),
                 icon_hover: or(wc.icon_hover, base.controls.icon_hover),
@@ -359,10 +390,15 @@ impl Skin {
 
 /// Deserializes `value`, listing keys `T` doesn't know (prefixed with
 /// `prefix`) instead of failing on them.
-fn deserialize<T: DeserializeOwned>(value: toml::Value, prefix: &str) -> Result<(T, Vec<String>), String> {
+fn deserialize<T: DeserializeOwned>(
+    value: toml::Value,
+    prefix: &str,
+) -> Result<(T, Vec<String>), String> {
     let mut ignored = Vec::new();
-    let out = serde_ignored::deserialize(value, |path| ignored.push(format!("unknown key `{prefix}{path}` ignored")))
-        .map_err(|e| e.to_string())?;
+    let out = serde_ignored::deserialize(value, |path| {
+        ignored.push(format!("unknown key `{prefix}{path}` ignored"))
+    })
+    .map_err(|e| e.to_string())?;
     Ok((out, ignored))
 }
 
@@ -374,7 +410,10 @@ pub fn app_dir(app: &str) -> Option<PathBuf> {
 }
 
 /// The folder every app used to share, `~/.config/patina/skins`.
-#[deprecated(since = "0.1.7", note = "each app keeps its own skins: use `app_dir` (ADR-0011)")]
+#[deprecated(
+    since = "0.1.7",
+    note = "each app keeps its own skins: use `app_dir` (ADR-0011)"
+)]
 pub fn shared_dir() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("patina").join("skins"))
 }
@@ -420,7 +459,11 @@ pub fn load_all(built_ins: &[(&str, &str)], dirs: &[PathBuf]) -> (Vec<Skin>, Vec
     for (file, text) in built_ins {
         match Skin::parse(text) {
             Ok(skin) => {
-                errors.extend(skin.warnings.iter().map(|w| format!("built-in {file}: {w}")));
+                errors.extend(
+                    skin.warnings
+                        .iter()
+                        .map(|w| format!("built-in {file}: {w}")),
+                );
                 add(&mut skins, skin);
             }
             Err(e) => errors.push(format!("built-in {file}: {e}")),
@@ -447,8 +490,15 @@ fn load_dir(dir: &Path) -> (Vec<Skin>, Vec<String>) {
         if path.extension().and_then(|e| e.to_str()) != Some("toml") {
             continue;
         }
-        let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
-        match std::fs::read_to_string(&path).map_err(|e| e.to_string()).and_then(|t| Skin::parse(&t)) {
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        match std::fs::read_to_string(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|t| Skin::parse(&t))
+        {
             Ok(mut skin) => {
                 errors.extend(skin.warnings.iter().map(|w| format!("{name}: {w}")));
                 skin.path = Some(path);
@@ -479,7 +529,10 @@ mod tests {
             assert!(!names.contains(&skin.name), "{file}: {} twice", skin.name);
             names.push(skin.name);
         }
-        assert_eq!(names, ["Dark Orange", "Calendar", "Notebook", "Steam Classic"]);
+        assert_eq!(
+            names,
+            ["Dark Orange", "Calendar", "Notebook", "Steam Classic"]
+        );
     }
 
     #[test]
@@ -503,12 +556,29 @@ mod tests {
     fn a_user_skin_replaces_a_built_in_of_the_same_name() {
         let dir = temp_dir("load");
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("mine.toml"), "format = 1\nname = \"Dark Orange\"\nbase = \"light\"").unwrap();
-        std::fs::write(dir.join("broken.toml"), "format = 1\nname = \"B\"\n[colors]\ntext = \"green\"").unwrap();
+        std::fs::write(
+            dir.join("mine.toml"),
+            "format = 1\nname = \"Dark Orange\"\nbase = \"light\"",
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("broken.toml"),
+            "format = 1\nname = \"B\"\n[colors]\ntext = \"green\"",
+        )
+        .unwrap();
         std::fs::write(dir.join("notes.txt"), "not a skin").unwrap();
         let (skins, errors) = load_all(BUILT_IN, std::slice::from_ref(&dir));
         let names: Vec<&str> = skins.iter().map(|t| t.name.as_str()).collect();
-        assert_eq!(names, ["Default", "Calendar", "Dark Orange", "Notebook", "Steam Classic"]);
+        assert_eq!(
+            names,
+            [
+                "Default",
+                "Calendar",
+                "Dark Orange",
+                "Notebook",
+                "Steam Classic"
+            ]
+        );
         let mine = &skins[2];
         assert_eq!(mine.base, Some(Base::Light));
         assert!(mine.path.is_some());
@@ -519,7 +589,10 @@ mod tests {
 
     #[test]
     fn parses_hex_colours() {
-        assert_eq!(parse_hex("#4C5844"), Some(Color32::from_rgb(0x4C, 0x58, 0x44)));
+        assert_eq!(
+            parse_hex("#4C5844"),
+            Some(Color32::from_rgb(0x4C, 0x58, 0x44))
+        );
         assert_eq!(
             parse_hex("#00000080"),
             Some(Color32::from_rgba_unmultiplied(0, 0, 0, 0x80))
@@ -539,7 +612,10 @@ mod tests {
 
     #[test]
     fn unset_colours_keep_egui_defaults() {
-        let skin = Skin::parse("format = 1\nname = \"Tiny\"\nbase = \"light\"\n[colors]\naccent = \"#FF0000\"").unwrap();
+        let skin = Skin::parse(
+            "format = 1\nname = \"Tiny\"\nbase = \"light\"\n[colors]\naccent = \"#FF0000\"",
+        )
+        .unwrap();
         let v = skin.visuals(egui::Visuals::light());
         assert_eq!(v.selection.bg_fill, Color32::RED);
         assert_eq!(v.panel_fill, egui::Visuals::light().panel_fill);
@@ -562,9 +638,15 @@ mod tests {
 
     #[test]
     fn window_controls_fall_back_to_control_colours() {
-        let skin = Skin::parse("format = 1\nname = \"W\"\nbase = \"dark\"\n[controls]\nhover = \"#111111\"").unwrap();
+        let skin = Skin::parse(
+            "format = 1\nname = \"W\"\nbase = \"dark\"\n[controls]\nhover = \"#111111\"",
+        )
+        .unwrap();
         let v = skin.visuals(egui::Visuals::dark());
-        assert_eq!(skin.frame_style(&v).controls.hover, Color32::from_gray(0x11));
+        assert_eq!(
+            skin.frame_style(&v).controls.hover,
+            Color32::from_gray(0x11)
+        );
     }
 
     #[test]
@@ -594,7 +676,12 @@ mod tests {
         assert_eq!(warnings, ["unknown key `app.mine.glwo` ignored"]);
         let (absent, _) = skin.app_section::<Mine>("absent").unwrap();
         assert_eq!(absent.glow, None);
-        assert!(Skin::parse("format = 1\nname = \"X\"\n[app.mine]\nglow = \"red\"").unwrap().app_section::<Mine>("mine").is_err());
+        assert!(
+            Skin::parse("format = 1\nname = \"X\"\n[app.mine]\nglow = \"red\"")
+                .unwrap()
+                .app_section::<Mine>("mine")
+                .is_err()
+        );
     }
 
     #[test]
@@ -616,13 +703,19 @@ mod tests {
     #[test]
     fn newer_formats_load_with_a_warning() {
         let skin = Skin::parse("format = 7\nname = \"Future\"\n[hologram]\nglow = 3").unwrap();
-        assert!(skin.warnings.iter().any(|w| w.contains("format 7")), "{:?}", skin.warnings);
+        assert!(
+            skin.warnings.iter().any(|w| w.contains("format 7")),
+            "{:?}",
+            skin.warnings
+        );
     }
 
     #[test]
     fn the_old_format_is_rejected_with_directions() {
         let err = Skin::parse("name = \"Old\"\n[player]\ntime = \"#FFFFFF\"").unwrap_err();
-        assert!(err.contains("old skin format") && err.contains("format = 1"), "{err}");
+        assert!(
+            err.contains("old skin format") && err.contains("format = 1"),
+            "{err}"
+        );
     }
-
 }

@@ -21,7 +21,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use egui::text::{CCursor, LayoutJob, TextFormat};
-use egui::{Color32, Event, EventFilter, Galley, Id, Key, Modifiers, Pos2, Rect, Sense, Stroke, Vec2, vec2};
+use egui::{
+    Color32, Event, EventFilter, Galley, Id, Key, Modifiers, Pos2, Rect, Sense, Stroke, Vec2, vec2,
+};
 
 use super::doc::{self, Para, Pos};
 use super::embeds;
@@ -66,28 +68,77 @@ fn code_text_id(editor: Id, para: usize) -> Id {
 }
 
 /// The right-click menu on the text; read-only, only Copy and Select All.
-fn context_menu(ui: &mut egui::Ui, has_selection: bool, read_only: bool, picked: &mut Option<MenuAction>) {
-    let mut item = |ui: &mut egui::Ui, enabled: bool, label: &str, keys: &str, action: MenuAction| {
-        if ui.add_enabled(enabled, egui::Button::new(label).shortcut_text(keys)).clicked() {
-            *picked = Some(action);
-            ui.close();
-        }
-    };
+fn context_menu(
+    ui: &mut egui::Ui,
+    has_selection: bool,
+    read_only: bool,
+    picked: &mut Option<MenuAction>,
+) {
+    let mut item =
+        |ui: &mut egui::Ui, enabled: bool, label: &str, keys: &str, action: MenuAction| {
+            if ui
+                .add_enabled(enabled, egui::Button::new(label).shortcut_text(keys))
+                .clicked()
+            {
+                *picked = Some(action);
+                ui.close();
+            }
+        };
     if read_only {
-        item(ui, has_selection, "Copy", "Ctrl+C", MenuAction::Clipboard(Clipboard::Copy));
+        item(
+            ui,
+            has_selection,
+            "Copy",
+            "Ctrl+C",
+            MenuAction::Clipboard(Clipboard::Copy),
+        );
         item(ui, true, "Select All", "Ctrl+A", MenuAction::SelectAll);
         return;
     }
-    item(ui, has_selection, "Cut", "Ctrl+X", MenuAction::Clipboard(Clipboard::Cut));
-    item(ui, has_selection, "Copy", "Ctrl+C", MenuAction::Clipboard(Clipboard::Copy));
-    item(ui, true, "Paste", "Ctrl+V", MenuAction::Clipboard(Clipboard::Paste));
+    item(
+        ui,
+        has_selection,
+        "Cut",
+        "Ctrl+X",
+        MenuAction::Clipboard(Clipboard::Cut),
+    );
+    item(
+        ui,
+        has_selection,
+        "Copy",
+        "Ctrl+C",
+        MenuAction::Clipboard(Clipboard::Copy),
+    );
+    item(
+        ui,
+        true,
+        "Paste",
+        "Ctrl+V",
+        MenuAction::Clipboard(Clipboard::Paste),
+    );
     ui.separator();
     item(ui, true, "Bold", "Ctrl+B", MenuAction::Inline(Inline::Bold));
-    item(ui, true, "Italic", "Ctrl+I", MenuAction::Inline(Inline::Italic));
-    item(ui, true, "Strikethrough", "Ctrl+Shift+X", MenuAction::Inline(Inline::Strike));
+    item(
+        ui,
+        true,
+        "Italic",
+        "Ctrl+I",
+        MenuAction::Inline(Inline::Italic),
+    );
+    item(
+        ui,
+        true,
+        "Strikethrough",
+        "Ctrl+Shift+X",
+        MenuAction::Inline(Inline::Strike),
+    );
     item(ui, true, "Code", "Ctrl+E", MenuAction::Inline(Inline::Code));
     ui.separator();
-    let code_label = if has_selection { "Make Code Block" } else { "Code Block" };
+    let code_label = if has_selection {
+        "Make Code Block"
+    } else {
+        "Code Block"
+    };
     item(ui, true, code_label, "", MenuAction::CodeBlock);
     item(ui, true, "Insert Table", "", MenuAction::InsertTable);
     ui.separator();
@@ -231,10 +282,19 @@ impl Editor {
         let index = if forward {
             found
                 .iter()
-                .position(|(p, r)| if on_match { (*p, r.start) > here } else { (*p, r.start) >= here })
+                .position(|(p, r)| {
+                    if on_match {
+                        (*p, r.start) > here
+                    } else {
+                        (*p, r.start) >= here
+                    }
+                })
                 .unwrap_or(0)
         } else {
-            found.iter().rposition(|(p, r)| (*p, r.start) < here).unwrap_or(found.len() - 1)
+            found
+                .iter()
+                .rposition(|(p, r)| (*p, r.start) < here)
+                .unwrap_or(found.len() - 1)
         };
         let (para, range) = found[index].clone();
         self.anchor = Pos::new(para, range.start);
@@ -300,11 +360,15 @@ impl Editor {
     // -----------------------------------------------------------------------
 
     fn line(&self, para: usize) -> &Line {
-        self.paras[para].as_text().expect("cursor is in a text paragraph")
+        self.paras[para]
+            .as_text()
+            .expect("cursor is in a text paragraph")
     }
 
     fn line_mut(&mut self, para: usize) -> &mut Line {
-        self.paras[para].as_text_mut().expect("cursor is in a text paragraph")
+        self.paras[para]
+            .as_text_mut()
+            .expect("cursor is in a text paragraph")
     }
 
     fn line_len(&self, para: usize) -> usize {
@@ -325,7 +389,9 @@ impl Editor {
         let para = if self.paras[para].as_text().is_some() {
             para
         } else {
-            self.next_text(para).or_else(|| self.prev_text(para)).unwrap_or(0)
+            self.next_text(para)
+                .or_else(|| self.prev_text(para))
+                .unwrap_or(0)
         };
         Pos::new(para, pos.col.min(self.line_len(para)))
     }
@@ -352,12 +418,18 @@ impl Editor {
     // -----------------------------------------------------------------------
 
     fn snapshot(&self) -> Snapshot {
-        Snapshot { paras: self.paras.clone(), cursor: self.cursor, anchor: self.anchor }
+        Snapshot {
+            paras: self.paras.clone(),
+            cursor: self.cursor,
+            anchor: self.anchor,
+        }
     }
 
     /// Records the state before an edit, joining runs of typing.
     fn begin(&mut self, kind: EditKind, now: f64) {
-        let joins = kind != EditKind::Other && self.last_kind == Some(kind) && now - self.last_time < UNDO_GROUP_SECS;
+        let joins = kind != EditKind::Other
+            && self.last_kind == Some(kind)
+            && now - self.last_time < UNDO_GROUP_SECS;
         if !joins {
             self.undo.push(self.snapshot());
             if self.undo.len() > UNDO_LIMIT {
@@ -422,7 +494,10 @@ impl Editor {
         let Pos { para, col } = self.cursor;
         let styles = match &self.line(para).block {
             Block::Raw => Vec::new(),
-            _ => self.typing.clone().unwrap_or_else(|| doc::styles_at(&self.line(para).spans, col)),
+            _ => self
+                .typing
+                .clone()
+                .unwrap_or_else(|| doc::styles_at(&self.line(para).spans, col)),
         };
         doc::insert(&mut self.line_mut(para).spans, col, text, &styles);
         self.cursor.col += text.chars().count();
@@ -453,7 +528,10 @@ impl Editor {
         if exit_empty && empty {
             match block {
                 Block::Item { depth, kind } if depth > 0 => {
-                    self.line_mut(para).block = Block::Item { kind, depth: depth - 1 };
+                    self.line_mut(para).block = Block::Item {
+                        kind,
+                        depth: depth - 1,
+                    };
                     return;
                 }
                 Block::Item { .. } | Block::Quote => {
@@ -478,12 +556,22 @@ impl Editor {
         if col == 0 && !empty {
             // At the start of a line, push it down rather than splitting it,
             // so a heading stays a heading.
-            let before = if matches!(block, Block::Heading(_)) { Block::Paragraph } else { next_block };
+            let before = if matches!(block, Block::Heading(_)) {
+                Block::Paragraph
+            } else {
+                next_block
+            };
             self.paras.insert(para, Para::text(before));
             self.cursor = Pos::new(para + 1, 0);
         } else {
             let tail = doc::split_off(&mut self.line_mut(para).spans, col);
-            self.paras.insert(para + 1, Para::Text(Line { block: next_block, spans: tail }));
+            self.paras.insert(
+                para + 1,
+                Para::Text(Line {
+                    block: next_block,
+                    spans: tail,
+                }),
+            );
             self.cursor = Pos::new(para + 1, 0);
         }
         self.anchor = self.cursor;
@@ -496,7 +584,11 @@ impl Editor {
         }
         let Pos { para, col } = self.cursor;
         if col > 0 {
-            let from = if word { doc::word_boundary(&doc::plain(&self.line(para).spans), col, false) } else { col - 1 };
+            let from = if word {
+                doc::word_boundary(&doc::plain(&self.line(para).spans), col, false)
+            } else {
+                col - 1
+            };
             doc::delete(&mut self.line_mut(para).spans, from..col);
             self.cursor.col = from;
             self.anchor = self.cursor;
@@ -505,7 +597,10 @@ impl Editor {
         // At the start of a line: first undo its paragraph style.
         match self.line(para).block.clone() {
             Block::Item { depth, kind } if depth > 0 => {
-                self.line_mut(para).block = Block::Item { kind, depth: depth - 1 };
+                self.line_mut(para).block = Block::Item {
+                    kind,
+                    depth: depth - 1,
+                };
                 return;
             }
             Block::Item { .. } | Block::Quote | Block::Heading(_) => {
@@ -527,7 +622,10 @@ impl Editor {
             // After a table or code block, an empty line just goes away.
             Some(_) if self.line_len(para) == 0 && self.next_text(para).is_some() => {
                 self.paras.remove(para);
-                let pos = self.prev_text(para).map(|p| Pos::new(p, usize::MAX)).unwrap_or_default();
+                let pos = self
+                    .prev_text(para)
+                    .map(|p| Pos::new(p, usize::MAX))
+                    .unwrap_or_default();
                 self.cursor = self.fix(pos);
                 self.anchor = self.cursor;
             }
@@ -543,10 +641,16 @@ impl Editor {
         let Pos { para, col } = self.cursor;
         let len = self.line_len(para);
         if col < len {
-            let to = if word { doc::word_boundary(&doc::plain(&self.line(para).spans), col, true) } else { col + 1 };
+            let to = if word {
+                doc::word_boundary(&doc::plain(&self.line(para).spans), col, true)
+            } else {
+                col + 1
+            };
             doc::delete(&mut self.line_mut(para).spans, col..to);
         } else if let Some(Para::Text(_)) = self.paras.get(para + 1) {
-            let Para::Text(next) = self.paras.remove(para + 1) else { unreachable!() };
+            let Para::Text(next) = self.paras.remove(para + 1) else {
+                unreachable!()
+            };
             doc::append(&mut self.line_mut(para).spans, next.spans);
         }
     }
@@ -554,7 +658,9 @@ impl Editor {
     /// Selected text paragraph indices.
     fn selected_paras(&self) -> Vec<usize> {
         let (a, b) = self.selection();
-        (a.para..=b.para).filter(|&i| self.paras[i].as_text().is_some()).collect()
+        (a.para..=b.para)
+            .filter(|&i| self.paras[i].as_text().is_some())
+            .collect()
     }
 
     /// Tab / Shift+Tab on list items. Returns whether anything was a list item.
@@ -570,7 +676,15 @@ impl Editor {
     }
 
     fn toggle_task(&mut self, para: usize, now: f64) {
-        if let Some(Line { block: Block::Item { kind: ListKind::Task(done), .. }, .. }) = self.paras[para].as_text() {
+        if let Some(Line {
+            block:
+                Block::Item {
+                    kind: ListKind::Task(done),
+                    ..
+                },
+            ..
+        }) = self.paras[para].as_text()
+        {
             let done = *done;
             self.begin(EditKind::Other, now);
             if let Block::Item { kind, .. } = &mut self.line_mut(para).block {
@@ -585,7 +699,8 @@ impl Editor {
         if !self.has_selection() {
             return match &self.typing {
                 Some(t) => t.contains(style),
-                None => doc::styles_at(&self.line(self.cursor.para).spans, self.cursor.col).contains(style),
+                None => doc::styles_at(&self.line(self.cursor.para).spans, self.cursor.col)
+                    .contains(style),
             };
         }
         let (a, b) = self.selection();
@@ -602,10 +717,9 @@ impl Editor {
     pub fn toggle_inline(&mut self, style: Inline, now: f64) {
         let on = !self.inline_active(&style);
         if !self.has_selection() {
-            let mut typing = self
-                .typing
-                .clone()
-                .unwrap_or_else(|| doc::styles_at(&self.line(self.cursor.para).spans, self.cursor.col));
+            let mut typing = self.typing.clone().unwrap_or_else(|| {
+                doc::styles_at(&self.line(self.cursor.para).spans, self.cursor.col)
+            });
             typing.retain(|s| *s != style);
             if on {
                 typing.push(style);
@@ -628,9 +742,18 @@ impl Editor {
         match &self.line(self.cursor.para).block {
             Block::Heading(n) => BlockStyle::Heading(*n),
             Block::Quote => BlockStyle::Quote,
-            Block::Item { kind: ListKind::Bullet, .. } => BlockStyle::Bullet,
-            Block::Item { kind: ListKind::Ordered(_), .. } => BlockStyle::Ordered,
-            Block::Item { kind: ListKind::Task(_), .. } => BlockStyle::Task,
+            Block::Item {
+                kind: ListKind::Bullet,
+                ..
+            } => BlockStyle::Bullet,
+            Block::Item {
+                kind: ListKind::Ordered(_),
+                ..
+            } => BlockStyle::Ordered,
+            Block::Item {
+                kind: ListKind::Task(_),
+                ..
+            } => BlockStyle::Task,
             _ => BlockStyle::Paragraph,
         }
     }
@@ -644,7 +767,9 @@ impl Editor {
             return;
         }
         let paras = self.selected_paras();
-        let all_already = paras.iter().all(|&i| block_matches(&self.line(i).block, style));
+        let all_already = paras
+            .iter()
+            .all(|&i| block_matches(&self.line(i).block, style));
         for i in paras {
             let line = self.line_mut(i);
             let depth = match line.block {
@@ -658,9 +783,18 @@ impl Editor {
                     BlockStyle::Paragraph | BlockStyle::Code => Block::Paragraph,
                     BlockStyle::Heading(n) => Block::Heading(n),
                     BlockStyle::Quote => Block::Quote,
-                    BlockStyle::Bullet => Block::Item { kind: ListKind::Bullet, depth },
-                    BlockStyle::Ordered => Block::Item { kind: ListKind::Ordered(1), depth },
-                    BlockStyle::Task => Block::Item { kind: ListKind::Task(false), depth },
+                    BlockStyle::Bullet => Block::Item {
+                        kind: ListKind::Bullet,
+                        depth,
+                    },
+                    BlockStyle::Ordered => Block::Item {
+                        kind: ListKind::Ordered(1),
+                        depth,
+                    },
+                    BlockStyle::Task => Block::Item {
+                        kind: ListKind::Task(false),
+                        depth,
+                    },
                 }
             };
         }
@@ -669,9 +803,16 @@ impl Editor {
     /// Turns the selected text paragraphs into one code block.
     fn make_code(&mut self) {
         let (a, b) = self.selection();
-        let code: Vec<String> =
-            (a.para..=b.para).filter_map(|i| self.paras[i].as_text().map(|l| doc::plain(&l.spans))).collect();
-        self.paras.splice(a.para..=b.para, [Para::Code { lang: String::new(), code: code.join("\n") }]);
+        let code: Vec<String> = (a.para..=b.para)
+            .filter_map(|i| self.paras[i].as_text().map(|l| doc::plain(&l.spans)))
+            .collect();
+        self.paras.splice(
+            a.para..=b.para,
+            [Para::Code {
+                lang: String::new(),
+                code: code.join("\n"),
+            }],
+        );
         self.focus_code = Some(a.para);
         if !matches!(self.paras.get(a.para + 1), Some(Para::Text(_))) {
             self.paras.insert(a.para + 1, Para::text(Block::Paragraph));
@@ -743,7 +884,9 @@ impl Editor {
             .iter()
             .map(|p| match p {
                 Para::Text(line) => doc::plain(&line.spans),
-                other => model::to_markdown(&doc::to_lines(std::slice::from_ref(other))).trim_end().to_string(),
+                other => model::to_markdown(&doc::to_lines(std::slice::from_ref(other)))
+                    .trim_end()
+                    .to_string(),
             })
             .collect();
         Some((plain.join("\n"), paras))
@@ -787,7 +930,10 @@ impl Editor {
                 Pos::new(para + count, col)
             }
             _ => {
-                paras.push(Para::Text(Line { block: Block::Paragraph, spans: tail }));
+                paras.push(Para::Text(Line {
+                    block: Block::Paragraph,
+                    spans: tail,
+                }));
                 Pos::new(para + count + 1, 0)
             }
         };
@@ -812,7 +958,12 @@ impl Editor {
                             self.clip = Some((plain, paras));
                         }
                     }
-                    Event::Key { key, pressed: true, modifiers, .. } => self.key(key, modifiers, now),
+                    Event::Key {
+                        key,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => self.key(key, modifiers, now),
                     _ => {}
                 }
                 continue;
@@ -852,7 +1003,12 @@ impl Editor {
                     self.begin(EditKind::Other, now);
                     self.paste(&text);
                 }
-                Event::Key { key, pressed: true, modifiers, .. } => self.key(key, modifiers, now),
+                Event::Key {
+                    key,
+                    pressed: true,
+                    modifiers,
+                    ..
+                } => self.key(key, modifiers, now),
                 _ => {}
             }
         }
@@ -864,7 +1020,10 @@ impl Editor {
         if key != Key::ArrowUp && key != Key::ArrowDown {
             self.h_pos = None;
         }
-        let edits = matches!(key, Key::Enter | Key::Backspace | Key::Delete | Key::Tab | Key::Z | Key::Y);
+        let edits = matches!(
+            key,
+            Key::Enter | Key::Backspace | Key::Delete | Key::Tab | Key::Z | Key::Y
+        );
         if self.read_only && edits {
             return;
         }
@@ -880,7 +1039,11 @@ impl Editor {
                 let target = if word {
                     let text = doc::plain(&self.line(para).spans);
                     let at = doc::word_boundary(&text, col, forward);
-                    if at != col { Pos::new(para, at) } else { self.step(forward) }
+                    if at != col {
+                        Pos::new(para, at)
+                    } else {
+                        self.step(forward)
+                    }
                 } else {
                     self.step(forward)
                 };
@@ -895,7 +1058,11 @@ impl Editor {
             Key::Home | Key::End => {
                 let end = key == Key::End;
                 let target = if mods.command {
-                    if end { Pos::new(self.paras.len() - 1, usize::MAX) } else { Pos::new(0, 0) }
+                    if end {
+                        Pos::new(self.paras.len() - 1, usize::MAX)
+                    } else {
+                        Pos::new(0, 0)
+                    }
                 } else {
                     self.row_edge(end)
                 };
@@ -918,7 +1085,10 @@ impl Editor {
                 self.typing = None;
             }
             Key::Tab => {
-                let is_list = self.selected_paras().iter().any(|&i| matches!(self.line(i).block, Block::Item { .. }));
+                let is_list = self
+                    .selected_paras()
+                    .iter()
+                    .any(|&i| matches!(self.line(i).block, Block::Item { .. }));
                 self.begin(EditKind::Other, now);
                 if is_list {
                     self.indent(if mods.shift { -1 } else { 1 });
@@ -946,7 +1116,8 @@ impl Editor {
         } else if col > 0 {
             Pos::new(para, col - 1)
         } else {
-            self.prev_text(para).map_or(self.cursor, |p| Pos::new(p, self.line_len(p)))
+            self.prev_text(para)
+                .map_or(self.cursor, |p| Pos::new(p, self.line_len(p)))
         }
     }
 
@@ -959,21 +1130,45 @@ impl Editor {
         let galley = &placed.galley;
         let caret = galley.pos_from_cursor(CCursor::new(col));
         let x = *self.h_pos.get_or_insert(caret.center().x);
-        let first_row = galley.rows.first().is_none_or(|r| caret.center().y < r.rect().max.y);
-        let last_row = galley.rows.last().is_none_or(|r| caret.center().y > r.rect().min.y);
+        let first_row = galley
+            .rows
+            .first()
+            .is_none_or(|r| caret.center().y < r.rect().max.y);
+        let last_row = galley
+            .rows
+            .last()
+            .is_none_or(|r| caret.center().y > r.rect().min.y);
         if down && !last_row {
-            return Pos::new(para, galley.cursor_from_pos(vec2(x, caret.max.y + 1.0)).index.0);
+            return Pos::new(
+                para,
+                galley.cursor_from_pos(vec2(x, caret.max.y + 1.0)).index.0,
+            );
         }
         if !down && !first_row {
-            return Pos::new(para, galley.cursor_from_pos(vec2(x, caret.min.y - 1.0)).index.0);
+            return Pos::new(
+                para,
+                galley.cursor_from_pos(vec2(x, caret.min.y - 1.0)).index.0,
+            );
         }
-        let target = if down { self.next_text(para) } else { self.prev_text(para) };
+        let target = if down {
+            self.next_text(para)
+        } else {
+            self.prev_text(para)
+        };
         let Some(target) = target else {
-            return if down { Pos::new(para, self.line_len(para)) } else { Pos::new(para, 0) };
+            return if down {
+                Pos::new(para, self.line_len(para))
+            } else {
+                Pos::new(para, 0)
+            };
         };
         match self.placed.get(target).cloned().flatten() {
             Some(other) => {
-                let y = if down { 1.0 } else { other.galley.size().y - 1.0 };
+                let y = if down {
+                    1.0
+                } else {
+                    other.galley.size().y - 1.0
+                };
                 Pos::new(target, other.galley.cursor_from_pos(vec2(x, y)).index.0)
             }
             None => Pos::new(target, 0),
@@ -986,8 +1181,11 @@ impl Editor {
         match self.placed.get(para).cloned().flatten() {
             Some(placed) => {
                 let c = CCursor::new(col);
-                let edge =
-                    if end { placed.galley.cursor_end_of_row(&c) } else { placed.galley.cursor_begin_of_row(&c) };
+                let edge = if end {
+                    placed.galley.cursor_end_of_row(&c)
+                } else {
+                    placed.galley.cursor_begin_of_row(&c)
+                };
                 Pos::new(para, edge.index.0)
             }
             None => Pos::new(para, if end { self.line_len(para) } else { 0 }),
@@ -1046,7 +1244,12 @@ impl Editor {
             ui.memory_mut(|m| {
                 m.set_focus_lock_filter(
                     self.id,
-                    EventFilter { tab: true, horizontal_arrows: true, vertical_arrows: true, escape: false },
+                    EventFilter {
+                        tab: true,
+                        horizontal_arrows: true,
+                        vertical_arrows: true,
+                        escape: false,
+                    },
                 )
             });
             self.handle_events(ui);
@@ -1072,10 +1275,19 @@ impl Editor {
                 let look = Look::of(&line.block);
                 ui.add_space(look.before);
                 let inset = look.inset;
-                let preedit = (focused && i == self.cursor.para).then(|| self.preedit.clone()).flatten();
-                let job = layout_job(line, &look, &visuals, width - inset, preedit.map(|p| (self.cursor.col, p)));
+                let preedit = (focused && i == self.cursor.para)
+                    .then(|| self.preedit.clone())
+                    .flatten();
+                let job = layout_job(
+                    line,
+                    &look,
+                    &visuals,
+                    width - inset,
+                    preedit.map(|p| (self.cursor.col, p)),
+                );
                 let galley = ui.fonts_mut(|f| f.layout_job(job));
-                let (rect, resp) = ui.allocate_exact_size(vec2(width, galley.size().y), Sense::click_and_drag());
+                let (rect, resp) =
+                    ui.allocate_exact_size(vec2(width, galley.size().y), Sense::click_and_drag());
                 let origin = rect.min + vec2(inset, 0.0);
                 let painter = ui.painter();
 
@@ -1083,29 +1295,61 @@ impl Editor {
                     let len = doc::len(&line.spans);
                     let start = if i == sel_a.para { sel_a.col } else { 0 };
                     let end = if i == sel_b.para { sel_b.col } else { len };
-                    paint_selection(painter, &galley, origin, start, end, i != sel_b.para, visuals.selection.bg_fill);
+                    paint_selection(
+                        painter,
+                        &galley,
+                        origin,
+                        start,
+                        end,
+                        i != sel_b.para,
+                        visuals.selection.bg_fill,
+                    );
                 }
                 for (_, range) in found.iter().filter(|(p, _)| *p == i) {
-                    paint_selection(painter, &galley, origin, range.start, range.end, false, mark);
+                    paint_selection(
+                        painter,
+                        &galley,
+                        origin,
+                        range.start,
+                        range.end,
+                        false,
+                        mark,
+                    );
                 }
-                if let Some(rect) = self.paint_marker(ui, &line.block, numbers[i], rect, origin, &galley, &visuals)
-                    && ui.interact(rect, self.id.with(("task", i)), Sense::click()).clicked()
+                if let Some(rect) =
+                    self.paint_marker(ui, &line.block, numbers[i], rect, origin, &galley, &visuals)
+                    && ui
+                        .interact(rect, self.id.with(("task", i)), Sense::click())
+                        .clicked()
                 {
                     tasks.push(i);
                 }
-                ui.painter().galley(origin, galley.clone(), look.color(&visuals));
-                placed[i] = Some(Placed { galley, origin, rect });
+                ui.painter()
+                    .galley(origin, galley.clone(), look.color(&visuals));
+                placed[i] = Some(Placed {
+                    galley,
+                    origin,
+                    rect,
+                });
                 presses.push((i, resp));
                 ui.add_space(look.after);
             } else {
                 ui.add_space(6.0);
                 let original = self.paras[i].clone();
                 let response = match &mut self.paras[i] {
-                    Para::Table(table) => embeds::table(ui, table, self.id.with(("table", i)), !self.read_only),
-                    Para::Code { lang, code } => embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only),
-                    Para::Image(image) => {
-                        embeds::image(ui, image, self.dir.as_deref(), self.id.with(("image", i)), !self.read_only)
+                    Para::Table(table) => {
+                        embeds::table(ui, table, self.id.with(("table", i)), !self.read_only)
                     }
+                    Para::Code { lang, code } => {
+                        embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
+                    }
+                    Para::Image(image) => embeds::image(
+                        ui,
+                        image,
+                        self.dir.as_deref(),
+                        self.id.with(("image", i)),
+                        !self.read_only,
+                    ),
                     Para::Text(_) => unreachable!(),
                 };
                 if response.changed {
@@ -1120,7 +1364,8 @@ impl Editor {
 
         // The empty space below the text puts the cursor at the end.
         let rest = ui.available_size_before_wrap();
-        let (below, below_resp) = ui.allocate_exact_size(vec2(width, rest.y.max(40.0)), Sense::click());
+        let (below, below_resp) =
+            ui.allocate_exact_size(vec2(width, rest.y.max(40.0)), Sense::click());
         let area = Rect::from_min_max(top, below.max);
         ui.interact(area, self.id, Sense::focusable_noninteractive());
         self.placed = placed;
@@ -1138,7 +1383,9 @@ impl Editor {
         below_resp.context_menu(|ui| context_menu(ui, has_selection, read_only, &mut menu));
         // Read-only, links are followed with a plain click, so show they can be.
         if read_only
-            && let Some(pos) = pointer.filter(|_| presses.iter().any(|(_, r)| r.hovered())).and_then(|p| self.pos_at(p))
+            && let Some(pos) = pointer
+                .filter(|_| presses.iter().any(|(_, r)| r.hovered()))
+                .and_then(|p| self.pos_at(p))
             && doc::link_at(&self.line(pos.para).spans, pos.col).is_some()
         {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -1155,7 +1402,9 @@ impl Editor {
                 continue;
             }
             if resp.double_clicked() {
-                let Pos { col, .. } = self.pos_at(pointer.unwrap_or_default()).unwrap_or(self.cursor);
+                let Pos { col, .. } = self
+                    .pos_at(pointer.unwrap_or_default())
+                    .unwrap_or(self.cursor);
                 let range = doc::word_at(&doc::plain(&self.line(*i).spans), col);
                 self.anchor = Pos::new(*i, range.start);
                 self.cursor = Pos::new(*i, range.end);
@@ -1164,7 +1413,9 @@ impl Editor {
                 self.anchor = Pos::new(*i, 0);
                 self.cursor = Pos::new(*i, self.line_len(*i));
                 self.dragging = false;
-            } else if resp.is_pointer_button_down_on() && ui.input(|inp| inp.pointer.primary_pressed()) {
+            } else if resp.is_pointer_button_down_on()
+                && ui.input(|inp| inp.pointer.primary_pressed())
+            {
                 if let Some(pos) = pointer.and_then(|p| self.pos_at(p)) {
                     let link = doc::link_at(&self.line(pos.para).spans, pos.col);
                     if read_only && let Some(url) = link {
@@ -1233,7 +1484,10 @@ impl Editor {
         if std::mem::take(&mut self.scroll_to_selection)
             && let Some(Some(placed)) = self.placed.get(self.cursor.para)
         {
-            let at = placed.galley.pos_from_cursor(CCursor::new(self.cursor.col)).translate(placed.origin.to_vec2());
+            let at = placed
+                .galley
+                .pos_from_cursor(CCursor::new(self.cursor.col))
+                .translate(placed.origin.to_vec2());
             ui.scroll_to_rect(at.expand(48.0), Some(egui::Align::Center));
         }
 
@@ -1242,9 +1496,13 @@ impl Editor {
             && ui.memory(|m| m.has_focus(self.id))
             && let Some(Some(placed)) = self.placed.get(self.cursor.para)
         {
-            let caret = placed.galley.pos_from_cursor(CCursor::new(self.cursor.col)).translate(placed.origin.to_vec2());
+            let caret = placed
+                .galley
+                .pos_from_cursor(CCursor::new(self.cursor.col))
+                .translate(placed.origin.to_vec2());
             let caret = Rect::from_min_size(caret.min, vec2(2.0, caret.height()));
-            ui.painter().rect_filled(caret, 0.0, visuals.text_cursor.stroke.color);
+            ui.painter()
+                .rect_filled(caret, 0.0, visuals.text_cursor.stroke.color);
             ui.output_mut(|o| {
                 o.ime = Some(egui::output::IMEOutput {
                     rect: area,
@@ -1310,12 +1568,20 @@ impl Editor {
         visuals: &egui::Visuals,
     ) -> Option<Rect> {
         let painter = ui.painter();
-        let first_row = galley.rows.first().map_or(Rect::from_min_size(Pos2::ZERO, vec2(0.0, BODY_SIZE)), |r| r.rect());
+        let first_row = galley
+            .rows
+            .first()
+            .map_or(Rect::from_min_size(Pos2::ZERO, vec2(0.0, BODY_SIZE)), |r| {
+                r.rect()
+            });
         let mid_y = origin.y + first_row.center().y;
         let color = visuals.text_color();
         match block {
             Block::Quote => {
-                let bar = Rect::from_min_max(rect.min + vec2(3.0, 0.0), Pos2::new(rect.min.x + 6.0, rect.max.y));
+                let bar = Rect::from_min_max(
+                    rect.min + vec2(3.0, 0.0),
+                    Pos2::new(rect.min.x + 6.0, rect.max.y),
+                );
                 painter.rect_filled(bar, 1.5, visuals.weak_text_color());
                 None
             }
@@ -1333,7 +1599,11 @@ impl Editor {
                                 painter.circle_stroke(c, 2.6, Stroke::new(1.1, color));
                             }
                             _ => {
-                                painter.rect_filled(Rect::from_center_size(c, Vec2::splat(4.6)), 0.0, color);
+                                painter.rect_filled(
+                                    Rect::from_center_size(c, Vec2::splat(4.6)),
+                                    0.0,
+                                    color,
+                                );
                             }
                         }
                         None
@@ -1350,14 +1620,28 @@ impl Editor {
                         None
                     }
                     ListKind::Task(done) => {
-                        let boxed = Rect::from_center_size(Pos2::new(x - 2.0, mid_y), Vec2::splat(14.0));
-                        let stroke =
-                            Stroke::new(1.2, if *done { visuals.selection.bg_fill } else { visuals.weak_text_color() });
+                        let boxed =
+                            Rect::from_center_size(Pos2::new(x - 2.0, mid_y), Vec2::splat(14.0));
+                        let stroke = Stroke::new(
+                            1.2,
+                            if *done {
+                                visuals.selection.bg_fill
+                            } else {
+                                visuals.weak_text_color()
+                            },
+                        );
                         if *done {
                             painter.rect_filled(boxed, 3.0, visuals.selection.bg_fill);
                             let c = boxed.center();
-                            let tick = vec![c + vec2(-3.5, 0.0), c + vec2(-1.0, 3.0), c + vec2(4.0, -3.0)];
-                            painter.add(egui::Shape::line(tick, Stroke::new(1.8, visuals.selection.stroke.color)));
+                            let tick = vec![
+                                c + vec2(-3.5, 0.0),
+                                c + vec2(-1.0, 3.0),
+                                c + vec2(4.0, -3.0),
+                            ];
+                            painter.add(egui::Shape::line(
+                                tick,
+                                Stroke::new(1.8, visuals.selection.stroke.color),
+                            ));
                         } else {
                             painter.rect_stroke(boxed, 3.0, stroke, egui::StrokeKind::Inside);
                         }
@@ -1374,9 +1658,27 @@ fn block_matches(block: &Block, style: BlockStyle) -> bool {
     match (block, style) {
         (Block::Paragraph, BlockStyle::Paragraph) | (Block::Quote, BlockStyle::Quote) => true,
         (Block::Heading(a), BlockStyle::Heading(b)) => *a == b,
-        (Block::Item { kind: ListKind::Bullet, .. }, BlockStyle::Bullet)
-        | (Block::Item { kind: ListKind::Ordered(_), .. }, BlockStyle::Ordered)
-        | (Block::Item { kind: ListKind::Task(_), .. }, BlockStyle::Task) => true,
+        (
+            Block::Item {
+                kind: ListKind::Bullet,
+                ..
+            },
+            BlockStyle::Bullet,
+        )
+        | (
+            Block::Item {
+                kind: ListKind::Ordered(_),
+                ..
+            },
+            BlockStyle::Ordered,
+        )
+        | (
+            Block::Item {
+                kind: ListKind::Task(_),
+                ..
+            },
+            BlockStyle::Task,
+        ) => true,
         _ => false,
     }
 }
@@ -1408,17 +1710,53 @@ impl Look {
             inset: 0.0,
         };
         match block {
-            Block::Heading(1) => Look { size: 26.0, bold: true, strong: true, before: 6.0, after: 8.0, ..body },
-            Block::Heading(2) => Look { size: 21.0, bold: true, strong: true, before: 6.0, after: 6.0, ..body },
-            Block::Heading(_) => Look { size: 17.0, bold: true, strong: true, before: 4.0, after: 4.0, ..body },
-            Block::Quote => Look { inset: 18.0, after: 4.0, ..body },
+            Block::Heading(1) => Look {
+                size: 26.0,
+                bold: true,
+                strong: true,
+                before: 6.0,
+                after: 8.0,
+                ..body
+            },
+            Block::Heading(2) => Look {
+                size: 21.0,
+                bold: true,
+                strong: true,
+                before: 6.0,
+                after: 6.0,
+                ..body
+            },
+            Block::Heading(_) => Look {
+                size: 17.0,
+                bold: true,
+                strong: true,
+                before: 4.0,
+                after: 4.0,
+                ..body
+            },
+            Block::Quote => Look {
+                inset: 18.0,
+                after: 4.0,
+                ..body
+            },
             Block::Item { kind, depth } => Look {
-                inset: INDENT * (*depth as f32 + 1.0) + if matches!(kind, ListKind::Task(_)) { 4.0 } else { 0.0 },
+                inset: INDENT * (*depth as f32 + 1.0)
+                    + if matches!(kind, ListKind::Task(_)) {
+                        4.0
+                    } else {
+                        0.0
+                    },
                 after: 3.0,
                 done: matches!(kind, ListKind::Task(true)),
                 ..body
             },
-            Block::Raw => Look { size: 13.0, mono: true, weak: true, after: 2.0, ..body },
+            Block::Raw => Look {
+                size: 13.0,
+                mono: true,
+                weak: true,
+                after: 2.0,
+                ..body
+            },
             _ => body,
         }
     }
@@ -1439,10 +1777,23 @@ fn format(styles: &[Inline], look: &Look, v: &egui::Visuals) -> TextFormat {
     let color = look.color(v);
     let bold = look.bold || styles.contains(&Inline::Bold);
     let italic = styles.contains(&Inline::Italic);
-    let mut f = if look.mono || styles.iter().any(|s| matches!(s, Inline::Code | Inline::Raw)) {
-        TextFormat { font_id: egui::FontId::monospace(look.size - 1.5), color, ..Default::default() }
+    let mut f = if look.mono
+        || styles
+            .iter()
+            .any(|s| matches!(s, Inline::Code | Inline::Raw))
+    {
+        TextFormat {
+            font_id: egui::FontId::monospace(look.size - 1.5),
+            color,
+            ..Default::default()
+        }
     } else {
-        TextFormat { font_id: fonts::note(look.size, italic), coords: fonts::weight(bold), color, ..Default::default() }
+        TextFormat {
+            font_id: fonts::note(look.size, italic),
+            coords: fonts::weight(bold),
+            color,
+            ..Default::default()
+        }
     };
     if styles.contains(&Inline::Code) {
         f.background = v.code_bg_color;
@@ -1462,7 +1813,13 @@ fn format(styles: &[Inline], look: &Look, v: &egui::Visuals) -> TextFormat {
 
 /// Lays out a paragraph's spans, with an IME composition shown underlined
 /// at its column.
-fn layout_job(line: &Line, look: &Look, v: &egui::Visuals, width: f32, preedit: Option<(usize, String)>) -> LayoutJob {
+fn layout_job(
+    line: &Line,
+    look: &Look,
+    v: &egui::Visuals,
+    width: f32,
+    preedit: Option<(usize, String)>,
+) -> LayoutJob {
     let mut job = LayoutJob::default();
     job.wrap.max_width = width.max(20.0);
     let mut spans: Vec<Span> = line.spans.clone();
@@ -1525,14 +1882,22 @@ fn paint_selection(
         let e = end.min(row_end);
         let carries = past_end && r == rows - 1;
         if s < e || (carries && end >= row_end && start <= row_end) {
-            let x0 = row.pos.x + row.row.x_offset(egui::text::CharIndex(s.min(row_end) - row_start));
-            let mut x1 = row.pos.x + row.row.x_offset(egui::text::CharIndex(e.max(s).min(row_end) - row_start));
+            let x0 = row.pos.x
+                + row
+                    .row
+                    .x_offset(egui::text::CharIndex(s.min(row_end) - row_start));
+            let mut x1 = row.pos.x
+                + row
+                    .row
+                    .x_offset(egui::text::CharIndex(e.max(s).min(row_end) - row_start));
             if carries || (end > row_end && r < rows - 1) {
                 x1 += 6.0;
             }
             let rect = row.rect();
-            let sel =
-                Rect::from_x_y_ranges(origin.x + x0..=origin.x + x1, origin.y + rect.min.y..=origin.y + rect.max.y);
+            let sel = Rect::from_x_y_ranges(
+                origin.x + x0..=origin.x + x1,
+                origin.y + rect.min.y..=origin.y + rect.max.y,
+            );
             painter.rect_filled(sel, 0.0, color);
         }
         row_start += count;
@@ -1560,7 +1925,13 @@ mod tests {
     }
 
     fn key(key: Key, modifiers: Modifiers) -> Event {
-        Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }
+        Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }
     }
 
     fn type_text(text: &str) -> Event {
@@ -1584,13 +1955,22 @@ mod tests {
     fn typing_and_enter_continue_a_list_and_leave_it_on_an_empty_item() {
         let (ctx, mut ed, mut t) = setup("- one\n");
         ed.cursor_to_first_line_end();
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Enter, Modifiers::NONE), type_text("two")]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Enter, Modifiers::NONE), type_text("two")],
+        );
         assert_eq!(ed.markdown(), "- one\n- two\n");
         frame(
             &ctx,
             &mut ed,
             &mut t,
-            vec![key(Key::Enter, Modifiers::NONE), key(Key::Enter, Modifiers::NONE), type_text("after")],
+            vec![
+                key(Key::Enter, Modifiers::NONE),
+                key(Key::Enter, Modifiers::NONE),
+                type_text("after"),
+            ],
         );
         assert_eq!(ed.markdown(), "- one\n- two\n\nafter\n");
     }
@@ -1611,17 +1991,37 @@ mod tests {
     fn backspace_at_the_start_removes_styles_then_joins_lines() {
         let (ctx, mut ed, mut t) = setup("first\n\n## Second\n");
         ed.move_to(Pos::new(1, 0), false);
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Backspace, Modifiers::NONE)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Backspace, Modifiers::NONE)],
+        );
         assert_eq!(ed.markdown(), "first\n\nSecond\n");
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Backspace, Modifiers::NONE)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Backspace, Modifiers::NONE)],
+        );
         assert_eq!(ed.markdown(), "firstSecond\n");
     }
 
     #[test]
     fn enter_at_the_start_of_a_heading_pushes_it_down() {
         let (ctx, mut ed, mut t) = setup("# Title\n");
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Enter, Modifiers::NONE)]);
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::ArrowUp, Modifiers::NONE), type_text("above")]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Enter, Modifiers::NONE)],
+        );
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::ArrowUp, Modifiers::NONE), type_text("above")],
+        );
         assert_eq!(ed.markdown(), "above\n\n# Title\n");
     }
 
@@ -1631,12 +2031,22 @@ mod tests {
         ed.cursor_to_first_line_end();
         frame(&ctx, &mut ed, &mut t, vec![type_text(" more")]);
         t += 2.0;
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Enter, Modifiers::NONE)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Enter, Modifiers::NONE)],
+        );
         frame(&ctx, &mut ed, &mut t, vec![key(Key::Z, Modifiers::COMMAND)]);
         assert_eq!(ed.markdown(), "start more\n");
         frame(&ctx, &mut ed, &mut t, vec![key(Key::Z, Modifiers::COMMAND)]);
         assert_eq!(ed.markdown(), "start\n");
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Z, Modifiers::COMMAND | Modifiers::SHIFT)],
+        );
         assert_eq!(ed.markdown(), "start more\n");
     }
 
@@ -1652,9 +2062,16 @@ mod tests {
             &ctx,
             &mut ed,
             &mut t,
-            vec![key(Key::Enter, Modifiers::NONE), key(Key::Enter, Modifiers::NONE), Event::Paste(plain)],
+            vec![
+                key(Key::Enter, Modifiers::NONE),
+                key(Key::Enter, Modifiers::NONE),
+                Event::Paste(plain),
+            ],
         );
-        assert_eq!(ed.markdown(), "**bold** text\n\n- item\n\n**bold** text\n\n- item\n");
+        assert_eq!(
+            ed.markdown(),
+            "**bold** text\n\n- item\n\n**bold** text\n\n- item\n"
+        );
     }
 
     #[test]
@@ -1692,7 +2109,12 @@ mod tests {
         let (ctx, mut ed, mut t) = setup("abc\n\ndef\n");
         ed.move_to(Pos::new(0, 1), false);
         ed.move_to(Pos::new(1, 2), true);
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Delete, Modifiers::NONE)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![key(Key::Delete, Modifiers::NONE)],
+        );
         assert_eq!(ed.markdown(), "af\n");
     }
 
@@ -1706,13 +2128,31 @@ mod tests {
     }
 
     fn press(at: Pos2, pressed: bool, button: egui::PointerButton) -> Event {
-        Event::PointerButton { pos: at, button, pressed, modifiers: Modifiers::NONE }
+        Event::PointerButton {
+            pos: at,
+            button,
+            pressed,
+            modifiers: Modifiers::NONE,
+        }
     }
 
     /// Clicks at `at` with a frame for the press and one for the release.
     fn click(ctx: &egui::Context, ed: &mut Editor, t: &mut f64, at: Pos2) {
-        frame(ctx, ed, t, vec![Event::PointerMoved(at), press(at, true, egui::PointerButton::Primary)]);
-        frame(ctx, ed, t, vec![press(at, false, egui::PointerButton::Primary)]);
+        frame(
+            ctx,
+            ed,
+            t,
+            vec![
+                Event::PointerMoved(at),
+                press(at, true, egui::PointerButton::Primary),
+            ],
+        );
+        frame(
+            ctx,
+            ed,
+            t,
+            vec![press(at, false, egui::PointerButton::Primary)],
+        );
     }
 
     /// Where character `col` of paragraph `para` was drawn, mid-row.
@@ -1741,13 +2181,29 @@ mod tests {
             &ctx,
             &mut ed,
             &mut t,
-            vec![type_text("x"), key(Key::Backspace, Modifiers::NONE), Event::Paste("p".into())],
+            vec![
+                type_text("x"),
+                key(Key::Backspace, Modifiers::NONE),
+                Event::Paste("p".into()),
+            ],
         );
-        frame(&ctx, &mut ed, &mut t, vec![key(Key::Enter, Modifiers::NONE), key(Key::Z, Modifiers::COMMAND)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![
+                key(Key::Enter, Modifiers::NONE),
+                key(Key::Z, Modifiers::COMMAND),
+            ],
+        );
         assert_eq!(ed.markdown(), "- [ ] task\n\nhello\n");
         assert_eq!(ed.edits(), 0);
         frame(&ctx, &mut ed, &mut t, vec![Event::Copy]);
-        assert!(ed.clip.as_ref().is_some_and(|(plain, _)| plain.contains("hello")));
+        assert!(
+            ed.clip
+                .as_ref()
+                .is_some_and(|(plain, _)| plain.contains("hello"))
+        );
     }
 
     #[test]
@@ -1808,16 +2264,42 @@ mod tests {
     fn dragging_a_selection_and_typing_replaces_it() {
         let (ctx, mut ed, mut t) = unfocused("hello world\n");
         let (from, to) = (screen_pos(&ed, 0, 0), screen_pos(&ed, 0, 5));
-        frame(&ctx, &mut ed, &mut t, vec![Event::PointerMoved(from), press(from, true, egui::PointerButton::Primary)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![
+                Event::PointerMoved(from),
+                press(from, true, egui::PointerButton::Primary),
+            ],
+        );
         frame(&ctx, &mut ed, &mut t, vec![Event::PointerMoved(to)]);
-        frame(&ctx, &mut ed, &mut t, vec![press(to, false, egui::PointerButton::Primary)]);
+        frame(
+            &ctx,
+            &mut ed,
+            &mut t,
+            vec![press(to, false, egui::PointerButton::Primary)],
+        );
         frame(&ctx, &mut ed, &mut t, vec![type_text("goodbye")]);
         assert_eq!(ed.markdown(), "goodbye world\n");
     }
 
     fn right_click(ctx: &egui::Context, ed: &mut Editor, t: &mut f64, at: Pos2) {
-        frame(ctx, ed, t, vec![Event::PointerMoved(at), press(at, true, egui::PointerButton::Secondary)]);
-        frame(ctx, ed, t, vec![press(at, false, egui::PointerButton::Secondary)]);
+        frame(
+            ctx,
+            ed,
+            t,
+            vec![
+                Event::PointerMoved(at),
+                press(at, true, egui::PointerButton::Secondary),
+            ],
+        );
+        frame(
+            ctx,
+            ed,
+            t,
+            vec![press(at, false, egui::PointerButton::Secondary)],
+        );
         frame(ctx, ed, t, vec![]);
     }
 
@@ -1830,7 +2312,10 @@ mod tests {
         right_click(&ctx, &mut ed, &mut t, at);
         assert!(egui::Popup::is_any_open(&ctx), "the context menu is open");
         assert_eq!(ed.selection(), (Pos::new(0, 6), Pos::new(0, 11)));
-        assert!(ctx.memory(|m| m.has_focus(ed.id)), "the editor has the keyboard");
+        assert!(
+            ctx.memory(|m| m.has_focus(ed.id)),
+            "the editor has the keyboard"
+        );
     }
 
     #[test]
@@ -1853,7 +2338,10 @@ mod tests {
         frame(&ctx, &mut ed, &mut t, vec![]);
         frame(&ctx, &mut ed, &mut t, vec![]);
         assert_eq!(ed.markdown(), "first\n\n```\nlet x = 1;\n```\n");
-        assert!(ctx.memory(|m| m.has_focus(code_text_id(ed.id, 1))), "the code block has the keyboard");
+        assert!(
+            ctx.memory(|m| m.has_focus(code_text_id(ed.id, 1))),
+            "the code block has the keyboard"
+        );
         frame(&ctx, &mut ed, &mut t, vec![type_text(" // one")]);
         assert_eq!(ed.markdown(), "first\n\n```\nlet x = 1; // one\n```\n");
     }

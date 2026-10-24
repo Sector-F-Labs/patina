@@ -18,15 +18,24 @@ const BOLD: f32 = 700.0;
 
 pub fn install(ctx: &egui::Context) {
     let mut fonts = FontDefinitions::default();
-    fonts
-        .font_data
-        .insert(BODY.into(), Arc::new(FontData::from_static(include_bytes!("../../assets/fonts/Ubuntu-Variable.ttf"))));
+    fonts.font_data.insert(
+        BODY.into(),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../../assets/fonts/Ubuntu-Variable.ttf"
+        ))),
+    );
     fonts.font_data.insert(
         ITALIC.into(),
-        Arc::new(FontData::from_static(include_bytes!("../../assets/fonts/Ubuntu-Italic-Variable.ttf"))),
+        Arc::new(FontData::from_static(include_bytes!(
+            "../../assets/fonts/Ubuntu-Italic-Variable.ttf"
+        ))),
     );
     // Emoji and symbols fall back to egui's own fonts.
-    let fallbacks: Vec<String> = fonts.families[&FontFamily::Proportional].iter().skip(1).cloned().collect();
+    let fallbacks: Vec<String> = fonts.families[&FontFamily::Proportional]
+        .iter()
+        .skip(1)
+        .cloned()
+        .collect();
     for (family, face) in [(BODY, BODY), (ITALIC, ITALIC)] {
         let mut list = vec![face.to_string()];
         list.extend(fallbacks.iter().cloned());
@@ -37,7 +46,10 @@ pub fn install(ctx: &egui::Context) {
 
 /// The font for note text of `size`, italic or not.
 pub fn note(size: f32, italic: bool) -> FontId {
-    FontId::new(size, FontFamily::Name(if italic { ITALIC } else { BODY }.into()))
+    FontId::new(
+        size,
+        FontFamily::Name(if italic { ITALIC } else { BODY }.into()),
+    )
 }
 
 /// The variable-font weight for bold or regular note text.

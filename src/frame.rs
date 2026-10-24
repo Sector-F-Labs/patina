@@ -89,7 +89,11 @@ pub fn viewport(builder: egui::ViewportBuilder, custom: bool) -> egui::ViewportB
 /// rounded corners show the desktop, and the panel colour otherwise. The
 /// panels paint everything else.
 pub fn clear_color(visuals: &egui::Visuals, custom: bool) -> [f32; 4] {
-    if custom { [0.0; 4] } else { visuals.panel_fill.to_normalized_gamma_f32() }
+    if custom {
+        [0.0; 4]
+    } else {
+        visuals.panel_fill.to_normalized_gamma_f32()
+    }
 }
 
 /// Compositors that can't minimise or maximise a window, by process name.
@@ -121,7 +125,11 @@ fn compositor() -> Option<String> {
         std::path::PathBuf::from(std::env::var_os("XDG_RUNTIME_DIR")?).join(display)
     };
     let stream = std::os::unix::net::UnixStream::connect(socket).ok()?;
-    let mut cred = libc::ucred { pid: 0, uid: 0, gid: 0 };
+    let mut cred = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
     let mut len = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
     // SAFETY: `cred` and `len` describe a writable `ucred`, as SO_PEERCRED expects.
     let ok = unsafe {
@@ -165,7 +173,12 @@ pub fn header_frame(style: &egui::Style, frame: &FrameStyle, radius: u8) -> egui
     egui::Frame::side_top_panel(style)
         .fill(frame.title_bar)
         .inner_margin(egui::Margin::symmetric(12, 8))
-        .corner_radius(egui::CornerRadius { nw: radius, ne: radius, sw: 0, se: 0 })
+        .corner_radius(egui::CornerRadius {
+            nw: radius,
+            ne: radius,
+            sw: 0,
+            se: 0,
+        })
 }
 
 /// The header bar: the app's controls on the left and right, the title
@@ -192,7 +205,13 @@ pub struct TitleBar<'a> {
 
 impl<'a> TitleBar<'a> {
     pub fn new(title: &'a str, style: &'a FrameStyle) -> Self {
-        Self { title, style, custom: true, menu_bar: false, minimise: true }
+        Self {
+            title,
+            style,
+            custom: true,
+            menu_bar: false,
+            minimise: true,
+        }
     }
 
     /// Whether the window buttons include minimise (the default, where the
@@ -219,8 +238,19 @@ impl<'a> TitleBar<'a> {
 
     /// Draws the bar. `left` is laid out left to right from the left edge;
     /// `right` right to left, ending at the window buttons.
-    pub fn show(self, ui: &mut egui::Ui, left: impl FnOnce(&mut egui::Ui), right: impl FnOnce(&mut egui::Ui)) {
-        let Self { title, style, custom, menu_bar, minimise } = self;
+    pub fn show(
+        self,
+        ui: &mut egui::Ui,
+        left: impl FnOnce(&mut egui::Ui),
+        right: impl FnOnce(&mut egui::Ui),
+    ) {
+        let Self {
+            title,
+            style,
+            custom,
+            menu_bar,
+            minimise,
+        } = self;
         let ctx = ui.ctx().clone();
         let bar = ui.max_rect();
         if custom {
@@ -250,31 +280,52 @@ impl<'a> TitleBar<'a> {
         if custom {
             let mut buttons = child(ui, row, egui::Layout::right_to_left(egui::Align::Center));
             buttons.spacing_mut().item_spacing.x = 4.0;
-            if button(&mut buttons, &style.controls, Button::Close).on_hover_text("Close").clicked() {
+            if button(&mut buttons, &style.controls, Button::Close)
+                .on_hover_text("Close")
+                .clicked()
+            {
                 ctx.send_viewport_cmd(ViewportCommand::Close);
             }
             if can_minimise_and_maximise() {
                 let max = maximized(&ctx);
-                let (kind, tip) = if max { (Button::Restore, "Restore") } else { (Button::Maximize, "Maximise") };
-                if button(&mut buttons, &style.controls, kind).on_hover_text(tip).clicked() {
+                let (kind, tip) = if max {
+                    (Button::Restore, "Restore")
+                } else {
+                    (Button::Maximize, "Maximise")
+                };
+                if button(&mut buttons, &style.controls, kind)
+                    .on_hover_text(tip)
+                    .clicked()
+                {
                     ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
                 }
                 if minimise
-                    && button(&mut buttons, &style.controls, Button::Minimize).on_hover_text("Minimise").clicked()
+                    && button(&mut buttons, &style.controls, Button::Minimize)
+                        .on_hover_text("Minimise")
+                        .clicked()
                 {
                     ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
                 }
             }
             buttons_left = buttons.min_rect().left() - CONTROLS_GAP;
         }
-        let mut right_ui = child(ui, row.with_max_x(buttons_left), egui::Layout::right_to_left(egui::Align::Center));
+        let mut right_ui = child(
+            ui,
+            row.with_max_x(buttons_left),
+            egui::Layout::right_to_left(egui::Align::Center),
+        );
         bar_controls(&mut right_ui, style);
         steady_controls(&mut right_ui);
         right(&mut right_ui);
-        let right_width = (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
+        let right_width =
+            (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
-        let mut left_ui = child(ui, left_rect, egui::Layout::left_to_right(egui::Align::Center));
+        let mut left_ui = child(
+            ui,
+            left_rect,
+            egui::Layout::left_to_right(egui::Align::Center),
+        );
         bar_controls(&mut left_ui, style);
         steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
@@ -294,12 +345,14 @@ impl<'a> TitleBar<'a> {
         // shortened with an ellipsis rather than running into either side.
         let room = bar.width() - 2.0 * left_width.max(right_width) - 16.0;
         if custom && room > 40.0 {
-            let galley = egui::WidgetText::from(egui::RichText::new(title).strong().color(style.title_text)).into_galley(
-                ui,
-                Some(egui::TextWrapMode::Truncate),
-                room,
-                egui::TextStyle::Body,
-            );
+            let galley =
+                egui::WidgetText::from(egui::RichText::new(title).strong().color(style.title_text))
+                    .into_galley(
+                        ui,
+                        Some(egui::TextWrapMode::Truncate),
+                        room,
+                        egui::TextStyle::Body,
+                    );
             let pos = bar.center() - galley.size() / 2.0;
             ui.painter().galley(pos, galley, style.title_text);
         }
@@ -360,7 +413,10 @@ fn window_menu(ui: &mut egui::Ui, ctx: &egui::Context) {
             ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
         }
         let max = maximized(ctx);
-        if ui.button(if max { "Restore" } else { "Maximise" }).clicked() {
+        if ui
+            .button(if max { "Restore" } else { "Maximise" })
+            .clicked()
+        {
             ctx.send_viewport_cmd(ViewportCommand::Maximized(!max));
         }
         ui.separator();
@@ -372,7 +428,11 @@ fn window_menu(ui: &mut egui::Ui, ctx: &egui::Context) {
 
 fn button(ui: &mut egui::Ui, colors: &WindowControlColors, kind: Button) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(BUTTON, Sense::click());
-    let fg = if resp.hovered() || resp.has_focus() { colors.icon_hover } else { colors.icon };
+    let fg = if resp.hovered() || resp.has_focus() {
+        colors.icon_hover
+    } else {
+        colors.icon
+    };
     let (fg, bg) = match kind {
         Button::Close if resp.hovered() => (colors.close_icon_hover, Some(colors.close_hover)),
         _ if resp.is_pointer_button_down_on() => (fg, Some(colors.pressed)),
@@ -391,15 +451,35 @@ fn button(ui: &mut egui::Ui, colors: &WindowControlColors, kind: Button) -> egui
             painter.line_segment([c + vec2(-r, r), c + vec2(r, r)], stroke);
         }
         Button::Maximize => {
-            painter.rect_stroke(egui::Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r)), 0.0, stroke, egui::StrokeKind::Middle);
+            painter.rect_stroke(
+                egui::Rect::from_center_size(c, vec2(2.0 * r, 2.0 * r)),
+                0.0,
+                stroke,
+                egui::StrokeKind::Middle,
+            );
         }
         Button::Restore => {
-            let back = egui::Rect::from_center_size(c + vec2(1.5, -1.5), vec2(2.0 * r - 1.5, 2.0 * r - 1.5));
-            let front = egui::Rect::from_center_size(c + vec2(-1.5, 1.5), vec2(2.0 * r - 1.5, 2.0 * r - 1.5));
+            let back = egui::Rect::from_center_size(
+                c + vec2(1.5, -1.5),
+                vec2(2.0 * r - 1.5, 2.0 * r - 1.5),
+            );
+            let front = egui::Rect::from_center_size(
+                c + vec2(-1.5, 1.5),
+                vec2(2.0 * r - 1.5, 2.0 * r - 1.5),
+            );
             painter.line_segment([back.left_top(), back.right_top()], stroke);
             painter.line_segment([back.right_top(), back.right_bottom()], stroke);
-            painter.line_segment([back.left_top(), egui::pos2(back.left(), front.top())], stroke);
-            painter.line_segment([back.right_bottom(), egui::pos2(front.right(), back.bottom())], stroke);
+            painter.line_segment(
+                [back.left_top(), egui::pos2(back.left(), front.top())],
+                stroke,
+            );
+            painter.line_segment(
+                [
+                    back.right_bottom(),
+                    egui::pos2(front.right(), back.bottom()),
+                ],
+                stroke,
+            );
             painter.rect_stroke(front, 0.0, stroke, egui::StrokeKind::Middle);
         }
         Button::Close => {
@@ -459,7 +539,8 @@ fn edge_at(window: egui::Rect, pos: egui::Pos2) -> Option<ResizeDirection> {
     let near = |d: f32, zone: f32| d < zone;
     let (l, r) = (pos.x - window.left(), window.right() - pos.x);
     let (t, b) = (pos.y - window.top(), window.bottom() - pos.y);
-    let corner = |a: f32, b: f32| near(a, CORNER) && near(b, CORNER) && (near(a, EDGE) || near(b, EDGE));
+    let corner =
+        |a: f32, b: f32| near(a, CORNER) && near(b, CORNER) && (near(a, EDGE) || near(b, EDGE));
     Some(match () {
         _ if corner(t, l) => ResizeDirection::NorthWest,
         _ if corner(t, r) => ResizeDirection::NorthEast,
@@ -493,8 +574,16 @@ pub fn edges(ctx: &egui::Context, radius: u8, border: Color32) {
         return;
     }
     let window = ctx.content_rect();
-    let painter = ctx.layer_painter(egui::LayerId::new(Order::Foreground, Id::new("window_border")));
-    painter.rect_stroke(window, radius, Stroke::new(1.0, border), egui::StrokeKind::Inside);
+    let painter = ctx.layer_painter(egui::LayerId::new(
+        Order::Foreground,
+        Id::new("window_border"),
+    ));
+    painter.rect_stroke(
+        window,
+        radius,
+        Stroke::new(1.0, border),
+        egui::StrokeKind::Inside,
+    );
 
     let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) else {
         return;
@@ -539,7 +628,9 @@ mod tests {
         release_grab(ctx, &mut input);
         let style = FrameStyle::from_visuals(&egui::Visuals::dark());
         let output = ctx.run_ui(input, |ui| {
-            egui::Panel::top("bar").show(ui, |ui| TitleBar::new("Title", &style).show(ui, |_| {}, |_| {}));
+            egui::Panel::top("bar").show(ui, |ui| {
+                TitleBar::new("Title", &style).show(ui, |_| {}, |_| {})
+            });
         });
         output.viewport_output[&egui::ViewportId::ROOT]
             .commands
@@ -582,12 +673,30 @@ mod tests {
     #[test]
     fn edges_and_corners_resize_the_right_way() {
         let w = window();
-        assert_eq!(edge_at(w, egui::pos2(400.0, 2.0)), Some(ResizeDirection::North));
-        assert_eq!(edge_at(w, egui::pos2(400.0, 598.0)), Some(ResizeDirection::South));
-        assert_eq!(edge_at(w, egui::pos2(1.0, 300.0)), Some(ResizeDirection::West));
-        assert_eq!(edge_at(w, egui::pos2(799.0, 300.0)), Some(ResizeDirection::East));
-        assert_eq!(edge_at(w, egui::pos2(2.0, 10.0)), Some(ResizeDirection::NorthWest));
-        assert_eq!(edge_at(w, egui::pos2(790.0, 598.0)), Some(ResizeDirection::SouthEast));
+        assert_eq!(
+            edge_at(w, egui::pos2(400.0, 2.0)),
+            Some(ResizeDirection::North)
+        );
+        assert_eq!(
+            edge_at(w, egui::pos2(400.0, 598.0)),
+            Some(ResizeDirection::South)
+        );
+        assert_eq!(
+            edge_at(w, egui::pos2(1.0, 300.0)),
+            Some(ResizeDirection::West)
+        );
+        assert_eq!(
+            edge_at(w, egui::pos2(799.0, 300.0)),
+            Some(ResizeDirection::East)
+        );
+        assert_eq!(
+            edge_at(w, egui::pos2(2.0, 10.0)),
+            Some(ResizeDirection::NorthWest)
+        );
+        assert_eq!(
+            edge_at(w, egui::pos2(790.0, 598.0)),
+            Some(ResizeDirection::SouthEast)
+        );
     }
 
     #[test]
@@ -607,7 +716,10 @@ mod hover_tests {
     /// right, and returns every control's rect.
     fn rects(ctx: &egui::Context, t: f64, events: Vec<egui::Event>) -> Vec<egui::Rect> {
         let input = egui::RawInput {
-            screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, vec2(1100.0, 700.0))),
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                vec2(1100.0, 700.0),
+            )),
             time: Some(t),
             events,
             ..Default::default()
@@ -615,23 +727,25 @@ mod hover_tests {
         let (mut left, mut right) = (Vec::new(), Vec::new());
         let _ = ctx.run_ui(input, |ui| {
             let style = FrameStyle::from_visuals(ui.visuals());
-            egui::Panel::top("bar").frame(header_frame(ui.style(), &style, 0)).show(ui, |ui| {
-                TitleBar::new("Title", &style).menu_bar(true).show(
-                    ui,
-                    |ui| {
-                        for m in ["File", "Edit", "View"] {
-                            left.push(ui.menu_button(m, |_| {}).response.rect);
-                        }
-                    },
-                    |ui| {
-                        right.push(ui.selectable_label(false, "Markdown").rect);
-                        right.push(ui.button("Insert").rect);
-                        right.push(ui.selectable_label(false, "B").rect);
-                        right.push(ui.selectable_label(true, "I").rect);
-                        right.push(ui.menu_button("Aa", |_| {}).response.rect);
-                    },
-                );
-            });
+            egui::Panel::top("bar")
+                .frame(header_frame(ui.style(), &style, 0))
+                .show(ui, |ui| {
+                    TitleBar::new("Title", &style).menu_bar(true).show(
+                        ui,
+                        |ui| {
+                            for m in ["File", "Edit", "View"] {
+                                left.push(ui.menu_button(m, |_| {}).response.rect);
+                            }
+                        },
+                        |ui| {
+                            right.push(ui.selectable_label(false, "Markdown").rect);
+                            right.push(ui.button("Insert").rect);
+                            right.push(ui.selectable_label(false, "B").rect);
+                            right.push(ui.selectable_label(true, "I").rect);
+                            right.push(ui.menu_button("Aa", |_| {}).response.rect);
+                        },
+                    );
+                });
         });
         left.extend(right);
         left
@@ -641,9 +755,15 @@ mod hover_tests {
     fn hovering_a_control_moves_nothing_even_with_stroked_skins() {
         let ctx = egui::Context::default();
         // Dark Orange strokes its controls, which is what used to shift them.
-        crate::skin::Skin::parse(crate::skin::BUILT_IN[0].1).unwrap().apply(&ctx);
+        crate::skin::Skin::parse(crate::skin::BUILT_IN[0].1)
+            .unwrap()
+            .apply(&ctx);
         let rest = rects(&ctx, 0.1, vec![]);
-        let rest = rects(&ctx, 0.2, vec![egui::Event::PointerGone]).into_iter().zip(rest).map(|(a, _)| a).collect::<Vec<_>>();
+        let rest = rects(&ctx, 0.2, vec![egui::Event::PointerGone])
+            .into_iter()
+            .zip(rest)
+            .map(|(a, _)| a)
+            .collect::<Vec<_>>();
         for (i, r) in rest.iter().enumerate() {
             let t = 1.0 + i as f64;
             rects(&ctx, t, vec![egui::Event::PointerMoved(r.center())]);
@@ -659,10 +779,21 @@ mod hover_tests {
             let plain = FrameStyle::from_visuals(ui.visuals());
             let before = ui.visuals().clone();
             bar_controls(ui, &plain);
-            assert_eq!(*ui.visuals(), before, "a bar in the panel colour is left alone");
-            let red = FrameStyle { title_bar: Color32::RED, title_text: Color32::WHITE, ..plain };
+            assert_eq!(
+                *ui.visuals(),
+                before,
+                "a bar in the panel colour is left alone"
+            );
+            let red = FrameStyle {
+                title_bar: Color32::RED,
+                title_text: Color32::WHITE,
+                ..plain
+            };
             bar_controls(ui, &red);
-            assert_eq!(ui.visuals().widgets.inactive.fg_stroke.color, Color32::WHITE);
+            assert_eq!(
+                ui.visuals().widgets.inactive.fg_stroke.color,
+                Color32::WHITE
+            );
             assert_eq!(ui.visuals().override_text_color, Some(Color32::WHITE));
         });
     }

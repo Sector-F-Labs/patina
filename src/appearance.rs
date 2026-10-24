@@ -37,7 +37,9 @@ fn run(ctx: &egui::Context) -> zbus::Result<()> {
     let changes = proxy.receive_signal("SettingChanged")?;
     set(ctx, read(&proxy)?);
     for signal in changes {
-        let Ok((namespace, key, value)) = signal.body().deserialize::<(String, String, OwnedValue)>() else {
+        let Ok((namespace, key, value)) =
+            signal.body().deserialize::<(String, String, OwnedValue)>()
+        else {
             continue;
         };
         if namespace == NAMESPACE && key == KEY {
