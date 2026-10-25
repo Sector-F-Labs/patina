@@ -67,6 +67,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0023](0023-menus-are-egui-s-own-size.md) | Menus are egui's own size, as Teleprinter's | Accepted |
 | [0024](0024-the-menu-bar-s-menus-fill-the-bar.md) | The menu bar's menus fill the bar, and light as a hovered tab | Accepted |
 | [0025](0025-a-changelog-for-apps.md) | A changelog for apps: what changed in each version, and what an app has to change | Accepted |
+| [0026](0026-code-on-the-text-field-background.md) | Code blocks sit on the text-field background, not egui's code grey | Accepted |
 
 ## Decision Relationship
 
@@ -99,6 +100,7 @@ flowchart TD
     F --> V[0024: Menu bar's menus fill the bar]
     I --> V
     A --> W[0025: A changelog for apps]
+    X[0015: Markdown from Notebook] --> Y[0026: Code on the text-field background]
 ```
 
 ## Revisit Triggers

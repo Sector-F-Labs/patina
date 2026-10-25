@@ -11,7 +11,15 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
-Nothing yet.
+### Upgrading
+
+- **Source drawn on `code_bg_color` by the app itself: use `extreme_bg_color`,** to match code
+  blocks. Only the Default skin looks different; skins set both to `surface` (ADR-0026).
+
+### Changed
+
+- Code blocks (`markdown::embeds::code`) are filled with `extreme_bg_color`, the text-field
+  background, not `code_bg_color`: white or near-black in Default instead of grey (ADR-0026).
 
 ## 0.1.11 — 2026-10-24
 

@@ -216,7 +216,8 @@ pub fn code(
     editable: bool,
 ) -> EmbedResponse {
     let mut out = EmbedResponse::default();
-    let fill = ui.visuals().code_bg_color;
+    // The text-field background, as editors use (ADR-0026).
+    let fill = ui.visuals().extreme_bg_color;
     egui::Frame::group(ui.style()).fill(fill).show(ui, |ui| {
         ui.horizontal(|ui| {
             let shown = LANGUAGES
