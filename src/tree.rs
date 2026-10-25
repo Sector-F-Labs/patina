@@ -4,7 +4,9 @@
 //! UnAmp (its ADR-0014).
 //!
 //! Call [`FolderTree::poll`] once a frame and [`FolderTree::show`] where the
-//! tree goes; `show` returns the folder the user clicked.
+//! tree goes; `show` returns the folder the user clicked. With
+//! [`FolderTree::files`] on, each folder lists its files after its
+//! subfolders, and `show` returns a clicked file too (ADR-0029).
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -12,15 +14,23 @@ use std::sync::mpsc;
 
 use egui::collapsing_header::CollapsingState;
 
+/// A folder's entry in the tree.
+#[derive(Clone)]
+struct Item {
+    path: PathBuf,
+    name: String,
+    folder: bool,
+}
+
 enum Children {
     Loading,
-    Loaded(Vec<(PathBuf, String)>),
+    Loaded(Vec<Item>),
     Failed(String),
 }
 
 struct Listing {
     path: PathBuf,
-    result: Result<Vec<(PathBuf, String)>, String>,
+    result: Result<Vec<Item>, String>,
 }
 
 pub struct FolderTree {
@@ -32,6 +42,8 @@ pub struct FolderTree {
     /// Folder whose ancestors should be opened (and which should be
     /// scrolled into view) once the tree has loaded far enough to show it.
     reveal: Option<PathBuf>,
+    /// Lists files as well as folders.
+    files: bool,
 }
 
 impl FolderTree {
@@ -44,7 +56,15 @@ impl FolderTree {
             tx,
             rx,
             reveal: None,
+            files: false,
         }
+    }
+
+    /// Lists each folder's files after its subfolders, for a project or
+    /// notes sidebar; `show` then returns clicked files too.
+    pub fn files(mut self, on: bool) -> Self {
+        self.files = on;
+        self
     }
 
     pub fn root(&self) -> &Path {
@@ -88,14 +108,16 @@ impl FolderTree {
         let tx = self.tx.clone();
         let ctx = ctx.clone();
         let path = path.to_path_buf();
+        let files = self.files;
         std::thread::spawn(move || {
-            let result = list_subfolders(&path);
+            let result = list(&path, files);
             let _ = tx.send(Listing { path, result });
             ctx.request_repaint();
         });
     }
 
-    /// Draws the tree; returns a folder the user clicked.
+    /// Draws the tree; returns a folder, or with [`Self::files`] a file, the
+    /// user clicked. `current` is shown selected.
     pub fn show(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
         let mut clicked = None;
         let root = self.root.clone();
@@ -135,7 +157,7 @@ impl FolderTree {
             resp
         };
 
-        // A folder known to have no subfolders gets no expander.
+        // A folder known to have nothing in it gets no expander.
         if matches!(self.children.get(path), Some(Children::Loaded(c)) if c.is_empty()) {
             let resp = ui
                 .horizontal(|ui| {
@@ -160,12 +182,37 @@ impl FolderTree {
                 ui.label(egui::RichText::new(e.as_str()).weak().small());
             }
             Some(Children::Loaded(list)) => {
-                for (child, child_name) in list.clone() {
-                    self.node(ui, &child, &child_name, current, false, clicked);
+                for item in list.clone() {
+                    if item.folder {
+                        self.node(ui, &item.path, &item.name, current, false, clicked);
+                    } else {
+                        self.file(ui, &item, current, clicked);
+                    }
                 }
             }
         });
         self.finish_reveal(path, &header_out.inner);
+    }
+
+    /// A file: a leaf, lined up with the folders' names.
+    fn file(
+        &mut self,
+        ui: &mut egui::Ui,
+        item: &Item,
+        current: &Path,
+        clicked: &mut Option<PathBuf>,
+    ) {
+        let resp = ui
+            .horizontal(|ui| {
+                ui.add_space(ui.spacing().icon_width + ui.spacing().icon_spacing);
+                ui.selectable_label(item.path == current, format!("\u{1F4C4} {}", item.name))
+                    .on_hover_text(item.path.display().to_string())
+            })
+            .inner;
+        if resp.clicked() {
+            *clicked = Some(item.path.clone());
+        }
+        self.finish_reveal(&item.path, &resp);
     }
 
     fn finish_reveal(&mut self, path: &Path, resp: &egui::Response) {
@@ -176,13 +223,14 @@ impl FolderTree {
     }
 }
 
-/// Subfolders of `dir`, sorted case-insensitively, hidden ones skipped.
-fn list_subfolders(dir: &Path) -> Result<Vec<(PathBuf, String)>, String> {
+/// Subfolders of `dir`, then with `files` its files, each sorted
+/// case-insensitively, hidden ones skipped.
+fn list(dir: &Path, files: bool) -> Result<Vec<Item>, String> {
     let entries = std::fs::read_dir(dir).map_err(|e| match e.kind() {
         std::io::ErrorKind::PermissionDenied => "permission denied".to_string(),
         _ => e.to_string(),
     })?;
-    let mut out: Vec<(PathBuf, String)> = entries
+    let mut out: Vec<Item> = entries
         .flatten()
         .filter_map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();
@@ -191,15 +239,15 @@ fn list_subfolders(dir: &Path) -> Result<Vec<(PathBuf, String)>, String> {
             }
             let path = entry.path();
             // d_type avoids a stat per entry; only symlinks need following.
-            let is_dir = match entry.file_type() {
+            let folder = match entry.file_type() {
                 Ok(ft) if ft.is_symlink() => path.is_dir(),
                 Ok(ft) => ft.is_dir(),
                 Err(_) => false,
             };
-            is_dir.then_some((path, name))
+            (folder || files).then_some(Item { path, name, folder })
         })
         .collect();
-    out.sort_by_key(|(_, name)| name.to_lowercase());
+    out.sort_by_key(|item| (!item.folder, item.name.to_lowercase()));
     Ok(out)
 }
 
@@ -215,18 +263,27 @@ mod tests {
             std::fs::create_dir_all(dir.join(d)).unwrap();
         }
         std::fs::write(dir.join("song.mp3"), b"").unwrap();
-        let names: Vec<String> = list_subfolders(&dir)
-            .unwrap()
-            .into_iter()
-            .map(|(_, n)| n)
-            .collect();
-        assert_eq!(names, ["Alpha", "beta", "gamma"]);
+        let names = |files| -> Vec<String> {
+            list(&dir, files)
+                .unwrap()
+                .into_iter()
+                .map(|item| item.name)
+                .collect()
+        };
+        assert_eq!(names(false), ["Alpha", "beta", "gamma"]);
+        // Files come after the folders, hidden ones still skipped.
+        std::fs::write(dir.join("Apple.rs"), b"").unwrap();
+        std::fs::write(dir.join(".env"), b"").unwrap();
+        assert_eq!(
+            names(true),
+            ["Alpha", "beta", "gamma", "Apple.rs", "song.mp3"]
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn unreadable_folder_is_an_error() {
-        assert!(list_subfolders(Path::new("/definitely/not/here")).is_err());
+        assert!(list(Path::new("/definitely/not/here"), true).is_err());
     }
 
     #[test]

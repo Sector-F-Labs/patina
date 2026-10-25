@@ -151,7 +151,7 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
 | `frame` | Own window frame: header bar, window buttons, edges, compositor hand-off | UnAmp, Photograph |
 | `appearance` | Follow the desktop's light/dark setting (XDG portal) | UnAmp, Photograph |
 | `skin` | Suite skin format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
-| `tree` | Lazily loaded sidebar folder tree | UnAmp |
+| `tree` | Lazily loaded sidebar folder tree, with files if asked | UnAmp, Programmer |
 | `menu` | Menus' style, and context menus in it | Files, the Patina desktop |
 | `highlight` | Syntax highlighting a line at a time, kept between edits | Text Editor |
 

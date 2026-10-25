@@ -70,6 +70,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0026](0026-code-on-the-text-field-background.md) | Code blocks sit on the text-field background, not egui's code grey | Accepted |
 | [0027](0027-one-highlighter-for-every-app.md) | One highlighter for every app, a line at a time, from Text Editor | Accepted |
 | [0028](0028-the-bar-s-buttons-are-photograph-s.md) | The title bar's buttons are sized as Photograph's Render and Edit | Accepted |
+| [0029](0029-the-folder-tree-can-list-files.md) | The folder tree can list files | Accepted |
 
 ## Decision Relationship
 
@@ -107,6 +108,7 @@ flowchart TD
     A --> Z
     F --> AA[0028: The bar's buttons are Photograph's]
     T --> AA
+    A --> AB[0029: The folder tree can list files]
 ```
 
 ## Revisit Triggers
@@ -123,4 +125,6 @@ flowchart TD
   [ADR-0019](0019-kinetic-scrolling-on-a-touchpad.md).
 - egui lights a menu bar's open menu, or lets the bar find its menus' buttons. See
   [ADR-0024](0024-the-menu-bar-s-menus-fill-the-bar.md).
+- An app needs the tree to hide folders such as `target/`, or what `.gitignore` names. See
+  [ADR-0029](0029-the-folder-tree-can-list-files.md).
 - A component only one app uses keeps growing app-specific options. Move it back into the app.
