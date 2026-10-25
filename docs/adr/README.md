@@ -68,6 +68,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0024](0024-the-menu-bar-s-menus-fill-the-bar.md) | The menu bar's menus fill the bar, and light as a hovered tab | Accepted |
 | [0025](0025-a-changelog-for-apps.md) | A changelog for apps: what changed in each version, and what an app has to change | Accepted |
 | [0026](0026-code-on-the-text-field-background.md) | Code blocks sit on the text-field background, not egui's code grey | Accepted |
+| [0027](0027-one-highlighter-for-every-app.md) | One highlighter for every app, a line at a time, from Text Editor | Accepted |
 
 ## Decision Relationship
 
@@ -101,6 +102,8 @@ flowchart TD
     I --> V
     A --> W[0025: A changelog for apps]
     X[0015: Markdown from Notebook] --> Y[0026: Code on the text-field background]
+    X --> Z[0027: One highlighter for every app]
+    A --> Z
 ```
 
 ## Revisit Triggers

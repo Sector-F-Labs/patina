@@ -6,7 +6,6 @@
 use std::path::Path;
 
 use egui::{Id, RichText};
-use egui_extras::syntax_highlighting::{self, CodeTheme};
 
 use super::model::{Align, Image, Table};
 
@@ -187,25 +186,6 @@ fn apply(table: &mut Table, cmd: TableCommand) {
     }
 }
 
-/// The name syntect knows a fence tag's language by: it looks syntaxes up
-/// by file extension.
-fn syntax_name(lang: &str) -> String {
-    match lang.to_lowercase().as_str() {
-        "" => "txt",
-        "rust" => "rs",
-        "python" => "py",
-        "javascript" => "js",
-        "typescript" => "ts",
-        "bash" | "shell" | "zsh" => "sh",
-        "markdown" => "md",
-        "yml" => "yaml",
-        "c++" => "cpp",
-        "golang" => "go",
-        other => return other.to_string(),
-    }
-    .to_string()
-}
-
 /// A code block; with `editable` off, its language is a label and its code
 /// can only be selected and copied.
 pub fn code(
@@ -264,15 +244,15 @@ pub fn code(
                 }
             });
         });
-        let theme = CodeTheme::from_memory(ui.ctx(), ui.style());
-        let language = syntax_name(lang);
+        let language = crate::highlight::language_for(lang);
+        let font = egui::TextStyle::Monospace.resolve(ui.style());
         let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap: f32| {
-            let mut job = syntax_highlighting::highlight(
-                ui.ctx(),
-                ui.style(),
-                &theme,
+            let mut job = crate::highlight::layout_job(
+                ui,
+                id.with("text"),
                 text.as_str(),
-                &language,
+                language.as_deref(),
+                &font,
             );
             job.wrap.max_width = wrap;
             ui.fonts_mut(|f| f.layout_job(job))
@@ -426,8 +406,8 @@ pub fn code_file(
     marks: &[std::ops::Range<usize>],
     current: Option<usize>,
 ) -> Option<egui::Rect> {
-    let theme = CodeTheme::from_memory(ui.ctx(), ui.style());
-    let language = syntax_name(lang);
+    let language = crate::highlight::language_for(lang);
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
     let rows = text.lines().count().max(1);
     let digits = rows.to_string().len();
     let numbers: String = (1..=rows).map(|n| format!("{n:>digits$}\n")).collect();
@@ -435,7 +415,7 @@ pub fn code_file(
     let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, _wrap: f32| {
         // Code isn't wrapped: lines keep their shape, and scroll sideways.
         let mut job =
-            syntax_highlighting::highlight(ui.ctx(), ui.style(), &theme, text.as_str(), &language);
+            crate::highlight::layout_job(ui, id, text.as_str(), language.as_deref(), &font);
         mark(
             &mut job,
             marks,

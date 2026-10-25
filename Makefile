@@ -18,10 +18,10 @@ build: ## Build the library and the gallery
 	cargo build --all-targets
 
 test: ## Run the tests
-	cargo test
+	cargo test --all-features
 
 check: test ## Run the tests and clippy, as before a release
-	cargo clippy --all-targets -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
 doc: ## Build the API docs and open them
 	cargo doc --no-deps --open

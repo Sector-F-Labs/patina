@@ -15,11 +15,23 @@ is added there in the same commit (ADR-0025).
 
 - **Source drawn on `code_bg_color` by the app itself: use `extreme_bg_color`,** to match code
   blocks. Only the Default skin looks different; skins set both to `surface` (ADR-0026).
+- **Apps with a highlighter of their own: use `patina::highlight`** (feature `highlight`, on with
+  `markdown`), so code looks the same everywhere. Apps calling `egui_extras::syntax_highlighting`
+  need `egui_extras`' `syntect` feature themselves now; Patina no longer turns it on (ADR-0027).
+
+### Added
+
+- `patina::highlight`, behind the `highlight` feature: Text Editor's highlighter, a line at a time
+  and kept between edits, over bat's syntaxes (`Highlighter`, `layout_job`, `detect`,
+  `language_for`, `languages`) (ADR-0027).
 
 ### Changed
 
 - Code blocks (`markdown::embeds::code`) are filled with `extreme_bg_color`, the text-field
   background, not `code_bg_color`: white or near-black in Default instead of grey (ADR-0026).
+- Code blocks and `embeds::code_file` are coloured by `patina::highlight`: bat's languages (TOML,
+  TypeScript, Dockerfile...), plain text in the skin's text colour (ADR-0027).
+- `make test` and `make check` build every feature.
 
 ## 0.1.11 — 2026-10-24
 

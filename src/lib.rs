@@ -4,6 +4,8 @@
 //! the design language and `docs/adr/` for why things are the way they are.
 //!
 //! - [`frame`]: the app's own window frame, header bar and resize edges.
+//! - [`highlight`] (feature `highlight`): syntax highlighting a line at a
+//!   time, for editors, code blocks and source files.
 //! - [`appearance`]: following the desktop's light/dark setting.
 //! - [`skin`]: skins in the suite format, shared by every app.
 //! - [`tabs`]: tabs in the title bar, in place of the window title.
@@ -17,6 +19,8 @@
 
 pub mod appearance;
 pub mod frame;
+#[cfg(feature = "highlight")]
+pub mod highlight;
 pub mod ime;
 pub mod kinetic;
 #[cfg(feature = "markdown")]

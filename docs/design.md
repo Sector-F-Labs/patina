@@ -150,6 +150,7 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
 | `skin` | Suite skin format: parse, apply to egui, frame colours, app sections, loading | UnAmp |
 | `tree` | Lazily loaded sidebar folder tree | UnAmp |
 | `menu` | Menus' style, and context menus in it | Files, the Patina desktop |
+| `highlight` | Syntax highlighting a line at a time, kept between edits | Text Editor |
 
 Run `make gallery` to see each one. A component belongs in Patina when a second app wants it.
 It may use only std, egui and small helper crates, never an app's own types
