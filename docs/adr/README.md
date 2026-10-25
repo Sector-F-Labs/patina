@@ -69,6 +69,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0025](0025-a-changelog-for-apps.md) | A changelog for apps: what changed in each version, and what an app has to change | Accepted |
 | [0026](0026-code-on-the-text-field-background.md) | Code blocks sit on the text-field background, not egui's code grey | Accepted |
 | [0027](0027-one-highlighter-for-every-app.md) | One highlighter for every app, a line at a time, from Text Editor | Accepted |
+| [0028](0028-the-bar-s-buttons-are-photograph-s.md) | The title bar's buttons are sized as Photograph's Render and Edit | Accepted |
 
 ## Decision Relationship
 
@@ -104,6 +105,8 @@ flowchart TD
     X[0015: Markdown from Notebook] --> Y[0026: Code on the text-field background]
     X --> Z[0027: One highlighter for every app]
     A --> Z
+    F --> AA[0028: The bar's buttons are Photograph's]
+    T --> AA
 ```
 
 ## Revisit Triggers

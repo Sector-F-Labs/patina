@@ -63,6 +63,9 @@ Implemented by `patina::frame`.
     - Calendar: Today and the Day/Week/Month switch.
 
     A consumption app with no output, like UnAmp, a music player, leaves the right side empty.
+  - **Its buttons are Photograph's:** 10 px either side of the text, 5 px above and below, and
+    at least 24 px high ([ADR-0028](adr/0028-the-bar-s-buttons-are-photograph-s.md)).
+    `TitleBar` sizes them.
   - **Elsewhere:** settings, status and secondary information go in the menus, a sidebar or the
     status bar, not the title bar. Photograph's GPU status sits in its status bar.
 - **Status bar:** every app has one along the bottom, holding both bottom corners

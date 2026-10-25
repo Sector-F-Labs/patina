@@ -34,6 +34,10 @@ const HEADER_MARGIN: egui::Margin = egui::Margin::symmetric(12, 8);
 const MENU_PADDING: f32 = 10.0;
 /// egui's, in its `menu_style`.
 const EGUI_MENU_PADDING: f32 = 2.0;
+/// Padding inside the bar's buttons, Photograph's Render and Edit (ADR-0028).
+const BAR_BUTTON_PADDING: egui::Vec2 = vec2(10.0, 5.0);
+/// The bar's buttons are at least this high (ADR-0022, ADR-0028).
+const BAR_BUTTON_HEIGHT: f32 = 24.0;
 
 /// libadwaita's `--window-radius`, as shipped in Ubuntu's Yaru styles too.
 pub const WINDOW_RADIUS: u8 = 15;
@@ -340,6 +344,7 @@ impl<'a> TitleBar<'a> {
         );
         bar_controls(&mut right_ui, style);
         steady_controls(&mut right_ui);
+        bar_buttons(&mut right_ui);
         right(&mut right_ui);
         let right_width =
             (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
@@ -494,6 +499,15 @@ fn menu_bar_style(style: &mut egui::Style, height: f32) {
 /// stroke, and the stroke adds to the widget's size, so with a skin that
 /// strokes its controls, hovering one widened it and pushed its
 /// neighbours along. Without strokes, hovering changes only the fill.
+/// Sizes the buttons on the bar's right, its output actions, as Photograph's
+/// Render and Edit (ADR-0028): 10 px either side of the text and 5 above and
+/// below, and never under 24 px high, where egui's are 4 by 1 and 18 high.
+fn bar_buttons(ui: &mut egui::Ui) {
+    let spacing = ui.spacing_mut();
+    spacing.button_padding = BAR_BUTTON_PADDING;
+    spacing.interact_size.y = spacing.interact_size.y.max(BAR_BUTTON_HEIGHT);
+}
+
 fn steady_controls(ui: &mut egui::Ui) {
     let w = &mut ui.visuals_mut().widgets;
     for state in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {

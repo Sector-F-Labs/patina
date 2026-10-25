@@ -27,6 +27,8 @@ is added there in the same commit (ADR-0025).
 
 ### Changed
 
+- The title bar's right-hand buttons are sized as Photograph's Render and Edit: 10 by 5 px of
+  padding and at least 24 px high, where they were egui's 4 by 1 and 18 high (ADR-0028).
 - Code blocks (`markdown::embeds::code`) are filled with `extreme_bg_color`, the text-field
   background, not `code_bg_color`: white or near-black in Default instead of grey (ADR-0026).
 - Code blocks and `embeds::code_file` are coloured by `patina::highlight`: bat's languages (TOML,
