@@ -127,7 +127,8 @@ Implemented by `patina::skin`. The format is documented in [skinning.md](skinnin
     feature.
 - **Where they come from:**
   - **Default:** stock egui, following the desktop.
-  - **Patina's built-ins:** Dark Orange (Photograph's look), Calendar, Notebook and Steam Classic.
+  - **Patina's built-ins:** Dark Orange (Photograph's look), Calendar, Everforest Dark, Notebook and
+    Steam Classic.
   - **The app's own built-ins.**
   - **The user's skins:** in the app's own `~/.config/<app>/skins/`. Each app keeps its own
     ([ADR-0011](adr/0011-each-app-its-own-skins-folder.md)).

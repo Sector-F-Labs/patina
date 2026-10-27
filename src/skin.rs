@@ -32,6 +32,10 @@ pub const BUILT_IN: &[(&str, &str)] = &[
         include_str!("../skins/dark-orange.toml"),
     ),
     ("calendar.toml", include_str!("../skins/calendar.toml")),
+    (
+        "everforest-dark.toml",
+        include_str!("../skins/everforest-dark.toml"),
+    ),
     ("notebook.toml", include_str!("../skins/notebook.toml")),
     (
         "steam-classic.toml",
@@ -531,7 +535,13 @@ mod tests {
         }
         assert_eq!(
             names,
-            ["Dark Orange", "Calendar", "Notebook", "Steam Classic"]
+            [
+                "Dark Orange",
+                "Calendar",
+                "Everforest Dark",
+                "Notebook",
+                "Steam Classic"
+            ]
         );
     }
 
@@ -575,6 +585,7 @@ mod tests {
                 "Default",
                 "Calendar",
                 "Dark Orange",
+                "Everforest Dark",
                 "Notebook",
                 "Steam Classic"
             ]

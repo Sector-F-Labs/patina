@@ -1,0 +1,53 @@
+# Everforest Dark: the Everforest palette, natural and low-contrast. Soft
+# green-tinted dark greys with muted green, aqua and orange accents. Built into
+# Patina, so every Patina app offers it. See docs/skinning.md for the format.
+
+format = 1
+name = "Everforest Dark"
+author = "Divan"
+base = "dark"
+corner_radius = 6
+shadows = true
+
+[colors]
+background = "#2D353B"    # bg0 - main background
+surface = "#272E33"       # bg_dim - panels, text fields, lists
+surface_alt = "#343F44"   # bg1 - alternate rows, hovered items
+border = "#3D484D"        # bg2 - outlines, dividers
+text = "#D3C6AA"          # fg - primary text
+text_strong = "#E6E2DC"   # fg_dim - headings, emphasized text
+text_weak = "#859289"     # grey0 - muted text, placeholders
+accent = "#A7C080"        # green - selection, slider fill, active toggles
+accent_text = "#2D353B"   # dark text on green accent
+link = "#7FBBB3"          # aqua - links, current item
+warning = "#E69875"       # orange - warnings
+error = "#E67E80"         # red - errors
+
+[controls]
+background = "#3D484D"    # bg2
+hover = "#475258"         # bg3
+pressed = "#4F5B5E"       # bg4
+text = "#D3C6AA"          # fg
+text_hover = "#E6E2DC"    # fg_dim
+
+[window]
+title_bar = "#272E33"     # bg_dim
+title_text = "#D3C6AA"    # fg
+border = "#3D484D"        # bg2
+corner_radius = 15
+
+[window.controls]
+icon = "#859289"          # grey0
+icon_hover = "#E6E2DC"    # fg_dim
+hover = "#475258"         # bg3
+pressed = "#4F5B5E"       # bg4
+close_hover = "#E67E80"   # red
+close_icon_hover = "#2D353B"  # bg0
+
+# UnAmp's own parts; other apps skip this section.
+[app.unamp]
+display = "#272E33"       # bg_dim - spectrum analyzer and seek-bar background
+time = "#A7C080"          # green - the big time display
+title = "#D3C6AA"         # fg - scrolling song title
+spectrum = ["#A7C080", "#DBBC7F", "#E69875"]   # green → yellow → orange, bottom to top
+spectrum_peak = "#E6E2DC" # fg_dim - peak dots

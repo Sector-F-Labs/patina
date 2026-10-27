@@ -20,6 +20,7 @@ The format began as UnAmp's skins (UnAmp ADR-0024) and moved here in
 | **Default** | Built in, no file | Stock egui, following the desktop's light/dark setting |
 | **Dark Orange** | Patina's [`skins/dark-orange.toml`](../skins/dark-orange.toml), in every app | Yaru-style dark greys and Ubuntu orange, the look Photograph was built in |
 | **Calendar** | Patina's [`skins/calendar.toml`](../skins/calendar.toml), in every app | A deep red title bar (freebsd.org's red) over warm off-white paper; Calendar starts in it |
+| **Everforest Dark** | Patina's [`skins/everforest-dark.toml`](../skins/everforest-dark.toml), in every app | The Everforest palette: soft green-tinted dark greys, a muted green accent |
 | **Notebook** | Patina's [`skins/notebook.toml`](../skins/notebook.toml), in every app | A leather-brown title bar over cream paper; Notebook starts in it |
 | **Steam Classic** | Patina's [`skins/steam-classic.toml`](../skins/steam-classic.toml), in every app | The olive-green VGUI look of the 2003–2008 Steam client, square corners; its comments document the format |
 | An app's built-ins | Compiled into that app | Anything only that app should offer |
