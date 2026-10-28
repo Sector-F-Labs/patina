@@ -5,7 +5,7 @@ egui desktop apps. Read `README.md` and `docs/design.md` first.
 
 ## Building an app on Patina
 
-Use the `patina-app` skill in `.claude/skills/patina-app/`. It has the setup, the rules and
+Use the `patina-app` skill in `skills/patina-app/`. It has the setup, the rules and
 compiling templates for a new app.
 
 ## Commands

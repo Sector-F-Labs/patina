@@ -65,18 +65,19 @@ Traps any egui app can fall into, such as burning a core while idle, are in
 
 ## Build an app with an agent
 
-Patina is meant to be used with a coding agent such as [Claude Code](https://claude.com/claude-code):
-the repository carries a skill that tells the agent how to build a Patina app, with templates
-that compile. To set it up, paste this into the agent:
+You can build a Patina app by hand; nothing here needs an agent. But the framework is made to
+make working with one easy: the components, the skin format and the frame are small and
+documented, and the repository carries a skill that tells a coding agent how to build a Patina
+app, with templates that compile. To set it up, paste this into your agent:
 
 > Clone https://github.com/Sector-F-Labs/patina, read its README and
-> `.claude/skills/patina-app/SKILL.md`, install that skill for me, and then make a new Patina
+> `skills/patina-app/SKILL.md`, install that skill for me, and then make a new Patina
 > app called *name* that does *what you want*. Run it and look at a screenshot before you
 > tell me it's done.
 
 The agent needs Rust (1.85 or newer), `make` and, on Linux, eframe's system libraries. With no
 display, it can take screenshots under `xvfb-run`. To keep the skill for every project, copy
-`.claude/skills/patina-app` to `~/.claude/skills/`; the agent can do it when you ask.
+`skills/patina-app` to wherever your agent keeps its skills; the agent can do it when you ask.
 
 ## Develop
 

@@ -22,8 +22,8 @@ as different as their skins make them and behave alike. The crate is `patina-ui`
      `make gallery`;
    - `docs/egui-pitfalls.md` and `docs/known-issues.md`, before debugging a window that burns a
      core, freezes or won't take focus.
-3. To have this skill in a new app's project, copy `.claude/skills/patina-app` from the clone
-   into the app's `.claude/skills/` (or `~/.claude/skills/` to have it for every project).
+3. To have this skill in a new app's project, copy `skills/patina-app` from the clone into
+   wherever your agent keeps skills, in the project or for every project.
 
 Other apps built on Patina, to learn from: [Photograph](https://github.com/divanvisagie/Photograph),
 [UnAmp](https://github.com/divanvisagie/UnAmp), [Teleprinter](https://github.com/Sector-F-Labs/teleprinter)
@@ -64,7 +64,7 @@ Start from the templates in `templates/` next to this file. They compile as they
 3. Copy `templates/Makefile` to the app's root and replace `APP_BIN`, and `APP_ENV` (the
    env-var prefix, e.g. `MYAPP`) in the screenshot target.
 4. Build the app's own panels in `app.rs`'s central panel, in its own modules.
-5. Add `README.md`, a `.gitignore` with `target/`, a `LICENSE` and a `CLAUDE.md` with the
+5. Add `README.md`, a `.gitignore` with `target/`, a `LICENSE` and an `AGENTS.md` with the
    commands, layout and gotchas.
 6. Run `make check`, then `make` to see the help, then look at the window (below).
 
