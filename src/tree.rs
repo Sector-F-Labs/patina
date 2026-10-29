@@ -10,7 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::{Arc, mpsc};
 
 use egui::collapsing_header::CollapsingState;
 
@@ -21,6 +21,17 @@ struct Item {
     name: String,
     folder: bool,
 }
+
+/// A folder's entry as a [`Lister`] reports it.
+pub struct Entry {
+    pub name: String,
+    pub folder: bool,
+}
+
+/// Lists a folder somewhere other than this machine's disk (ADR-0030): its
+/// entries in any order. The tree skips hidden ones, drops files unless
+/// [`FolderTree::files`] is on, and sorts. It runs on a worker thread.
+pub type Lister = Arc<dyn Fn(&Path) -> Result<Vec<Entry>, String> + Send + Sync>;
 
 enum Children {
     Loading,
@@ -44,6 +55,8 @@ pub struct FolderTree {
     reveal: Option<PathBuf>,
     /// Lists files as well as folders.
     files: bool,
+    /// Where folders are listed from; this machine's disk if none.
+    lister: Option<Lister>,
 }
 
 impl FolderTree {
@@ -57,6 +70,7 @@ impl FolderTree {
             rx,
             reveal: None,
             files: false,
+            lister: None,
         }
     }
 
@@ -64,6 +78,13 @@ impl FolderTree {
     /// notes sidebar; `show` then returns clicked files too.
     pub fn files(mut self, on: bool) -> Self {
         self.files = on;
+        self
+    }
+
+    /// Lists folders with `lister` instead of reading this machine's disk,
+    /// for a project that lives on another one (ADR-0030).
+    pub fn lister(mut self, lister: Lister) -> Self {
+        self.lister = Some(lister);
         self
     }
 
@@ -109,8 +130,12 @@ impl FolderTree {
         let ctx = ctx.clone();
         let path = path.to_path_buf();
         let files = self.files;
+        let lister = self.lister.clone();
         std::thread::spawn(move || {
-            let result = list(&path, files);
+            let result = match lister {
+                Some(lister) => lister(&path).map(|entries| arrange(&path, entries, files)),
+                None => list(&path, files),
+            };
             let _ = tx.send(Listing { path, result });
             ctx.request_repaint();
         });
@@ -230,25 +255,36 @@ fn list(dir: &Path, files: bool) -> Result<Vec<Item>, String> {
         std::io::ErrorKind::PermissionDenied => "permission denied".to_string(),
         _ => e.to_string(),
     })?;
-    let mut out: Vec<Item> = entries
+    let entries = entries
         .flatten()
-        .filter_map(|entry| {
+        .map(|entry| {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
-                return None;
-            }
-            let path = entry.path();
             // d_type avoids a stat per entry; only symlinks need following.
             let folder = match entry.file_type() {
-                Ok(ft) if ft.is_symlink() => path.is_dir(),
+                Ok(ft) if ft.is_symlink() => entry.path().is_dir(),
                 Ok(ft) => ft.is_dir(),
                 Err(_) => false,
             };
-            (folder || files).then_some(Item { path, name, folder })
+            Entry { name, folder }
+        })
+        .collect();
+    Ok(arrange(dir, entries, files))
+}
+
+/// What a tree shows of `entries`: no hidden ones, files only with `files`,
+/// folders first, each sorted case-insensitively.
+fn arrange(dir: &Path, entries: Vec<Entry>, files: bool) -> Vec<Item> {
+    let mut out: Vec<Item> = entries
+        .into_iter()
+        .filter(|entry| !entry.name.starts_with('.') && (entry.folder || files))
+        .map(|Entry { name, folder }| Item {
+            path: dir.join(&name),
+            name,
+            folder,
         })
         .collect();
     out.sort_by_key(|item| (!item.folder, item.name.to_lowercase()));
-    Ok(out)
+    out
 }
 
 #[cfg(test)]
@@ -279,6 +315,46 @@ mod tests {
             ["Alpha", "beta", "gamma", "Apple.rs", "song.mp3"]
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn another_lister_s_entries_are_arranged_the_same() {
+        let entries = [
+            Entry {
+                name: "b.rs".into(),
+                folder: false,
+            },
+            Entry {
+                name: ".git".into(),
+                folder: true,
+            },
+            Entry {
+                name: "src".into(),
+                folder: true,
+            },
+            Entry {
+                name: "A.rs".into(),
+                folder: false,
+            },
+        ];
+        let names = |files| -> Vec<String> {
+            let entries = entries
+                .iter()
+                .map(|e| Entry {
+                    name: e.name.clone(),
+                    folder: e.folder,
+                })
+                .collect();
+            arrange(Path::new("/remote/p"), entries, files)
+                .into_iter()
+                .map(|item| item.path.to_string_lossy().into_owned())
+                .collect()
+        };
+        assert_eq!(names(false), ["/remote/p/src"]);
+        assert_eq!(
+            names(true),
+            ["/remote/p/src", "/remote/p/A.rs", "/remote/p/b.rs"]
+        );
     }
 
     #[test]

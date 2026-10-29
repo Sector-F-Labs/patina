@@ -9,6 +9,14 @@ Sector F apps build on `develop`, so they get changes before a release: after
 `cargo update -p patina-ui`, read **Unreleased** as well. Each change that alters what apps write
 is added there in the same commit (ADR-0025).
 
+## Unreleased
+
+### Added
+
+- `FolderTree::lister(..)`: the tree lists folders from a function you give it instead of this
+  machine's disk, for a project on another machine (`tree::Lister`, `tree::Entry`; Programmer's
+  ADR-0030). Nothing changes for an app that doesn't call it.
+
 ## 0.1.13 — 2026-10-28
 
 ### Added
