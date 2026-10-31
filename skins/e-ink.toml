@@ -1,0 +1,54 @@
+# E-Ink: pure white paper and black ink, for e-ink and other low-refresh
+# displays. No shadows, no tints, black outlines, and only a few flat greys, so
+# nothing depends on subtle colour. Built into Patina, so every Patina app
+# offers it. See docs/skinning.md for the format.
+
+format = 1
+name = "E-Ink"
+author = "Divan"
+base = "light"
+corner_radius = 0
+shadows = false
+
+[colors]
+background = "#FFFFFF"    # paper
+surface = "#F0F0F0"       # panels, text fields, lists, slider rails
+surface_alt = "#E0E0E0"   # alternate rows, hovered items
+border = "#000000"        # outlines, dividers
+text = "#000000"          # primary text
+text_strong = "#000000"   # headings, emphasized text
+text_weak = "#444444"     # muted text, placeholders (still 9:1 on white)
+accent = "#000000"        # selection, slider fill, active toggles
+accent_text = "#FFFFFF"   # white text on the black accent
+link = "#000000"          # links, current item (underlined by egui)
+warning = "#000000"       # no colour on e-ink
+error = "#000000"
+
+[controls]
+background = "#E0E0E0"
+hover = "#C8C8C8"
+pressed = "#000000"
+text = "#000000"
+text_hover = "#000000"
+
+[window]
+title_bar = "#000000"
+title_text = "#FFFFFF"
+border = "#000000"
+corner_radius = 0
+
+[window.controls]
+icon = "#FFFFFF"
+icon_hover = "#000000"
+hover = "#FFFFFF"
+pressed = "#C8C8C8"
+close_hover = "#FFFFFF"
+close_icon_hover = "#000000"
+
+# UnAmp's own parts; other apps skip this section.
+[app.unamp]
+display = "#FFFFFF"
+time = "#000000"
+title = "#000000"
+spectrum = ["#000000", "#444444", "#888888"]
+spectrum_peak = "#000000"

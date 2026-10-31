@@ -16,6 +16,7 @@ is added there in the same commit (ADR-0025).
 - `FolderTree::files(true)`: the tree lists each folder's files after its subfolders, and `show`
   returns a clicked file as well as a clicked folder (ADR-0029).
 - **Everforest Dark**, a built-in skin in the Everforest palette.
+- **E-Ink**, a built-in high-contrast black-on-white skin for e-ink displays.
 
 ## 0.1.12 — 2026-10-25
 

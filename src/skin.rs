@@ -32,6 +32,7 @@ pub const BUILT_IN: &[(&str, &str)] = &[
         include_str!("../skins/dark-orange.toml"),
     ),
     ("calendar.toml", include_str!("../skins/calendar.toml")),
+    ("e-ink.toml", include_str!("../skins/e-ink.toml")),
     (
         "everforest-dark.toml",
         include_str!("../skins/everforest-dark.toml"),
@@ -538,6 +539,7 @@ mod tests {
             [
                 "Dark Orange",
                 "Calendar",
+                "E-Ink",
                 "Everforest Dark",
                 "Notebook",
                 "Steam Classic"
@@ -585,6 +587,7 @@ mod tests {
                 "Default",
                 "Calendar",
                 "Dark Orange",
+                "E-Ink",
                 "Everforest Dark",
                 "Notebook",
                 "Steam Classic"
