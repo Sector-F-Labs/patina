@@ -117,6 +117,9 @@ pub struct Controls {
     pub text: Option<Hex>,
     pub text_hover: Option<Hex>,
     pub border: Option<Hex>,
+    /// Slider rail. egui draws it as a plain fill with no outline, so on a
+    /// skin where `surface` is the page colour it needs its own colour.
+    pub track: Option<Hex>,
 }
 
 /// The app's own window frame: its title bar, edge and corners.
@@ -331,6 +334,9 @@ impl Skin {
                     widget.bg_fill = fill;
                 }
             }
+        }
+        if let Some(track) = get(k.track) {
+            v.widgets.inactive.bg_fill = track;
         }
         if let Some(link) = get(c.link) {
             v.hyperlink_color = link;

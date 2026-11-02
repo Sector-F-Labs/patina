@@ -96,6 +96,7 @@ example.
 | `pressed` | While pressed |
 | `text` | Text and icons on controls (defaults to `colors.text`) |
 | `text_hover` | Text on hovered or pressed controls (defaults to `colors.text_strong`) |
+| `track` | Slider rail (defaults to `colors.surface`); egui cannot outline it, so a skin with a page-coloured surface sets this |
 | `border` | Control outlines (defaults to `colors.border`) |
 
 egui draws buttons with one fill and slider/checkbox tracks with another. Tracks at rest use

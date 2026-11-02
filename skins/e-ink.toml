@@ -13,7 +13,7 @@ shadows = false
 
 [colors]
 background = "#FFFFFF"    # paper
-surface = "#FFFFFF"       # panels, text fields, lists, slider rails (outlined)
+surface = "#FFFFFF"       # panels, text fields, lists
 surface_alt = "#FFFFFF"   # alternate rows
 border = "#000000"        # outlines, dividers
 text = "#000000"          # primary text
@@ -31,6 +31,7 @@ hover = "#FFFFFF"
 pressed = "#000000"
 text = "#000000"
 text_hover = "#000000"
+track = "#000000"         # slider rail: egui cannot outline it, so it is a black line
 
 [window]
 title_bar = "#FFFFFF"
