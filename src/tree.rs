@@ -8,7 +8,7 @@
 //! [`FolderTree::files`] on, each folder lists its files after its
 //! subfolders, and `show` returns a clicked file too (ADR-0029).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, mpsc};
 
@@ -57,7 +57,14 @@ pub struct FolderTree {
     files: bool,
     /// Where folders are listed from; this machine's disk if none.
     lister: Option<Lister>,
+    /// What the filter box holds: only names containing it are shown.
+    filter: String,
 }
+
+/// Folders listed at once while a filter looks through the whole tree.
+const SCAN_AT_ONCE: usize = 8;
+/// How deep a filter looks, so a link back up the tree can't loop.
+const SCAN_DEPTH: usize = 16;
 
 impl FolderTree {
     pub fn new(root: PathBuf, root_label: String) -> Self {
@@ -71,6 +78,7 @@ impl FolderTree {
             reveal: None,
             files: false,
             lister: None,
+            filter: String::new(),
         }
     }
 
@@ -86,6 +94,32 @@ impl FolderTree {
     pub fn lister(mut self, lister: Lister) -> Self {
         self.lister = Some(lister);
         self
+    }
+
+    /// A box for the filter, to go above [`Self::show`]: as it's typed in, the
+    /// tree shows only the files (and folders) whose names contain it,
+    /// whatever the case, with the folders they're in. Folders not yet
+    /// listed are listed to look inside them. Escape empties it. Whether the
+    /// text changed.
+    pub fn filter_box(&mut self, ui: &mut egui::Ui) -> bool {
+        let edit = egui::TextEdit::singleline(&mut self.filter)
+            .hint_text("Filter files")
+            .desired_width(f32::INFINITY);
+        let resp = ui.add(edit);
+        if resp.has_focus() && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+            self.filter.clear();
+            return true;
+        }
+        resp.changed()
+    }
+
+    /// Sets the filter, as typing in [`Self::filter_box`] does.
+    pub fn set_filter(&mut self, filter: &str) {
+        self.filter = filter.to_string();
+    }
+
+    pub fn filter(&self) -> &str {
+        &self.filter
     }
 
     pub fn root(&self) -> &Path {
@@ -144,11 +178,110 @@ impl FolderTree {
     /// Draws the tree; returns a folder, or with [`Self::files`] a file, the
     /// user clicked. `current` is shown selected.
     pub fn show(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
+        if !self.filter.trim().is_empty() {
+            return self.show_filtered(ui, current);
+        }
         let mut clicked = None;
         let root = self.root.clone();
         let label = self.root_label.clone();
         self.node(ui, &root, &label, current, true, &mut clicked);
         clicked
+    }
+
+    /// The tree cut down to what the filter matches. Looks in each folder
+    /// below the root, listing those not listed yet a few at a time.
+    fn show_filtered(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
+        let needle = self.filter.trim().to_lowercase();
+        let (shown, pending) = self.scan(&needle, ui.ctx());
+        let mut clicked = None;
+        ui.label(format!("\u{1F4C2} {}", self.root_label));
+        let root = self.root.clone();
+        self.filtered(ui, &root, current, &shown, &mut clicked);
+        if pending {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label(egui::RichText::new("Looking…").weak().small());
+            });
+        } else if shown.is_empty() {
+            ui.label(egui::RichText::new("Nothing matches").weak().small());
+        }
+        clicked
+    }
+
+    /// The paths whose names contain `needle` (lower case) and the folders
+    /// above them, from what's listed; whether folders are still to be
+    /// listed. Asks for some of those.
+    fn scan(&mut self, needle: &str, ctx: &egui::Context) -> (HashSet<PathBuf>, bool) {
+        let mut busy = self
+            .children
+            .values()
+            .filter(|c| matches!(c, Children::Loading))
+            .count();
+        let mut pending = busy > 0;
+        let mut shown = HashSet::new();
+        let mut stack = vec![(self.root.clone(), 0)];
+        while let Some((dir, depth)) = stack.pop() {
+            match self.children.get(&dir) {
+                None => {
+                    pending = true;
+                    if busy < SCAN_AT_ONCE {
+                        self.request(&dir, ctx);
+                        busy += 1;
+                    }
+                }
+                Some(Children::Loaded(list)) => {
+                    for item in list {
+                        if item.name.to_lowercase().contains(needle) {
+                            let mut up = Some(item.path.as_path());
+                            while let Some(p) = up.filter(|p| *p != self.root && shown.insert(p.to_path_buf())) {
+                                up = p.parent();
+                            }
+                        }
+                        if item.folder && depth < SCAN_DEPTH {
+                            stack.push((item.path.clone(), depth + 1));
+                        }
+                    }
+                }
+                Some(Children::Loading | Children::Failed(_)) => {}
+            }
+        }
+        (shown, pending)
+    }
+
+    fn filtered(
+        &mut self,
+        ui: &mut egui::Ui,
+        dir: &Path,
+        current: &Path,
+        shown: &HashSet<PathBuf>,
+        clicked: &mut Option<PathBuf>,
+    ) {
+        let Some(Children::Loaded(list)) = self.children.get(dir) else {
+            return;
+        };
+        for item in list.clone() {
+            if !shown.contains(&item.path) {
+                continue;
+            }
+            if item.folder {
+                // Lined up with the files' names, as a folder's expander does in the tree.
+                let resp = ui
+                    .horizontal(|ui| {
+                        ui.add_space(ui.spacing().icon_width + ui.spacing().icon_spacing);
+                        ui.selectable_label(item.path == current, format!("\u{1F4C1} {}", item.name))
+                            .on_hover_text(item.path.display().to_string())
+                    })
+                    .inner;
+                if resp.clicked() {
+                    *clicked = Some(item.path.clone());
+                }
+                ui.indent(("filtered", &item.path), |ui| {
+                    self.filtered(ui, &item.path, current, shown, clicked)
+                });
+            } else {
+                self.file(ui, &item, current, clicked);
+            }
+        }
     }
 
     fn node(
@@ -355,6 +488,33 @@ mod tests {
             names(true),
             ["/remote/p/src", "/remote/p/A.rs", "/remote/p/b.rs"]
         );
+    }
+
+    #[test]
+    fn a_filter_keeps_matches_and_the_folders_they_are_in() {
+        let dir = std::env::temp_dir().join(format!("patina-tree-filter-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("src/deep")).unwrap();
+        std::fs::create_dir_all(dir.join("docs")).unwrap();
+        for f in ["src/deep/Needle.rs", "src/other.rs", "docs/a.md"] {
+            std::fs::write(dir.join(f), b"").unwrap();
+        }
+        let mut tree = FolderTree::new(dir.clone(), "p".into()).files(true);
+        let ctx = egui::Context::default();
+        // Listing is on threads: scan until nothing is pending.
+        let mut found = (HashSet::new(), true);
+        for _ in 0..200 {
+            tree.poll();
+            found = tree.scan("needle", &ctx);
+            if !found.1 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(!found.1, "scan finished");
+        let want: HashSet<PathBuf> = ["src", "src/deep", "src/deep/Needle.rs"].iter().map(|p| dir.join(p)).collect();
+        assert_eq!(found.0, want);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
