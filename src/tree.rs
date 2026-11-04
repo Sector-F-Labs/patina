@@ -492,6 +492,50 @@ fn arrange(dir: &Path, entries: Vec<Entry>, files: bool) -> Vec<Item> {
 
 #[cfg(test)]
 mod tests {
+    /// Whether egui flagged a widget id clash (a red box and a fire) in any
+    /// frame while the tree loaded and opened `target`.
+    fn clash_while_opening(files: bool) -> Vec<String> {
+        let dir = std::env::temp_dir().join(format!("patina-clash-test-{}-{files}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for d in ["a/b/c", "a/b/d", "a/e", "f/g"].into_iter().map(String::from).chain((0..60).map(|n| format!("a/b/c/n{n}/m"))) {
+            std::fs::create_dir_all(dir.join(d)).unwrap();
+        }
+        std::fs::write(dir.join("a/b/c/x.txt"), b"").unwrap();
+        let mut tree = FolderTree::new(dir.clone(), "root".into()).files(files);
+        tree.reveal(&dir.join("a/b/c"));
+        let ctx = egui::Context::default();
+        ctx.options_mut(|o| o.warn_on_id_clash = true);
+        let mut clashes = Vec::new();
+        for frame in 0..40 {
+            let mut input = egui::RawInput::default();
+            input.screen_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 600.0)));
+            input.time = Some(frame as f64 * 0.05);
+            let out = ctx.run_ui(input, |ui| {
+                tree.poll();
+                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
+                    tree.show(ui, &dir);
+                });
+            });
+            for s in &out.shapes {
+                if let egui::epaint::Shape::Text(t) = &s.shape {
+                    if t.galley.text().contains('\u{1F525}') {
+                        clashes.push(format!("frame {frame}: {}", t.galley.text()));
+                    }
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+        clashes
+    }
+
+    #[test]
+    fn opening_folders_clashes_no_ids() {
+        for files in [false, true] {
+            assert_eq!(clash_while_opening(files), Vec::<String>::new(), "files={files}");
+        }
+    }
+
     use super::*;
 
     #[test]
