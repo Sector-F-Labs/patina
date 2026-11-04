@@ -730,3 +730,77 @@ mod tests {
         );
     }
 }
+
+/// Keeps hovering a control from resizing it, with its border intact.
+/// egui draws an idle `selectable_label` without a frame, so its border
+/// takes up nothing, but takes the border's width off its padding. A
+/// hovered one gets the frame, border included, back at full padding, so
+/// it grew by the border's width and pushed its neighbours along. Here the
+/// idle control's padding is given the width back (as `expansion`), and a
+/// lit one has none, so every state is one size whatever its border: a
+/// skin may stroke all its controls, even in high contrast.
+/// The tree and the title bar use it; apps call it for lists of
+/// `selectable_label`s of their own, such as a sidebar.
+pub fn steady_controls(ui: &mut egui::Ui) {
+    let w = &mut ui.visuals_mut().widgets;
+    w.inactive.expansion = w.inactive.bg_stroke.width;
+    for state in [&mut w.hovered, &mut w.active, &mut w.open] {
+        state.expansion = 0.0;
+    }
+}
+
+#[cfg(test)]
+mod steady_tests {
+    use super::*;
+
+    /// The size of a `selectable_label` idle, then with the pointer on it.
+    fn sizes(width: f32, steady: bool) -> ((egui::Vec2, egui::Pos2), (egui::Vec2, egui::Pos2)) {
+        let ctx = egui::Context::default();
+        let size = std::cell::Cell::new((egui::Vec2::ZERO, egui::Pos2::ZERO));
+        let run = |pointer: Option<egui::Pos2>| {
+            let mut input = egui::RawInput::default();
+            input.screen_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0)));
+            input.events.push(match pointer {
+                Some(p) => egui::Event::PointerMoved(p),
+                None => egui::Event::PointerGone,
+            });
+            let out = ctx.run_ui(input, |ui| {
+                ui.visuals_mut().widgets.inactive.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.hovered.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.active.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
+                if steady {
+                    steady_controls(ui);
+                }
+                size.set((ui.selectable_label(false, "Folder").rect.size(), egui::Pos2::ZERO));
+            });
+            // Where the text was drawn.
+            let text = out
+                .shapes
+                .iter()
+                .find_map(|s| match &s.shape {
+                    egui::epaint::Shape::Text(t) => Some(t.pos),
+                    _ => None,
+                })
+                .unwrap();
+            size.set((size.get().0, text));
+        };
+        for _ in 0..3 {
+            run(None);
+        }
+        let idle = size.get();
+        for _ in 0..3 {
+            run(Some(egui::pos2(12.0, 12.0)));
+        }
+        (idle, size.get())
+    }
+
+    #[test]
+    fn hovering_a_stroked_control_does_not_resize_it() {
+        let (idle, hovered) = sizes(1.0, false);
+        assert_ne!(idle, hovered, "egui alone resizes; the test would prove nothing");
+        for width in [1.0, 2.0] {
+            let (idle, hovered) = sizes(width, true);
+            assert_eq!(idle, hovered, "border {width}");
+        }
+    }
+}

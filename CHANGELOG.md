@@ -11,6 +11,13 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Fixed
+
+- Hovering a row of the folder tree no longer shifts it and its neighbours by a pixel with skins
+  that stroke their controls, and the borders stay: a control is one size idle, hovered or pressed
+  whatever its border. New `skin::steady_controls(ui)` does the same for an app's own lists
+  of `selectable_label`s, such as a sidebar.
+
 ### Added
 
 - Markdown shows SVG images (with their text), and an `<img src=".." alt="..">` tag alone on its line as an image,

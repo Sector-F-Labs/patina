@@ -343,7 +343,7 @@ impl<'a> TitleBar<'a> {
             egui::Layout::right_to_left(egui::Align::Center),
         );
         bar_controls(&mut right_ui, style);
-        steady_controls(&mut right_ui);
+        crate::skin::steady_controls(&mut right_ui);
         bar_buttons(&mut right_ui);
         right(&mut right_ui);
         let right_width =
@@ -364,7 +364,7 @@ impl<'a> TitleBar<'a> {
             egui::Layout::left_to_right(egui::Align::Center),
         );
         bar_controls(&mut left_ui, style);
-        steady_controls(&mut left_ui);
+        crate::skin::steady_controls(&mut left_ui);
         // Where the controls end, measured inside: a menu bar spans its area.
         let measured = |ui: &mut egui::Ui| {
             left(ui);
@@ -494,11 +494,6 @@ fn menu_bar_style(style: &mut egui::Style, height: f32) {
     }
 }
 
-/// Takes the strokes off the bar's controls. egui draws an idle toggle
-/// (`selectable_label`) without a frame and a hovered one with a framed
-/// stroke, and the stroke adds to the widget's size, so with a skin that
-/// strokes its controls, hovering one widened it and pushed its
-/// neighbours along. Without strokes, hovering changes only the fill.
 /// Sizes the buttons on the bar's right, its output actions, as Photograph's
 /// Render and Edit (ADR-0028): 10 px either side of the text and 5 above and
 /// below, and never under 24 px high, where egui's are 4 by 1 and 18 high.
@@ -506,13 +501,6 @@ fn bar_buttons(ui: &mut egui::Ui) {
     let spacing = ui.spacing_mut();
     spacing.button_padding = BAR_BUTTON_PADDING;
     spacing.interact_size.y = spacing.interact_size.y.max(BAR_BUTTON_HEIGHT);
-}
-
-fn steady_controls(ui: &mut egui::Ui) {
-    let w = &mut ui.visuals_mut().widgets;
-    for state in [&mut w.inactive, &mut w.hovered, &mut w.active, &mut w.open] {
-        state.bg_stroke.width = 0.0;
-    }
 }
 
 #[derive(Clone, Copy)]

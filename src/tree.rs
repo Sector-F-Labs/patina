@@ -217,6 +217,15 @@ impl FolderTree {
     /// Draws the tree; returns a folder, or with [`Self::files`] a file, the
     /// user clicked. `current` is shown selected.
     pub fn show(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
+        // Hovering a row must not resize it (see `skin::steady_controls`).
+        ui.scope(|ui| {
+            crate::skin::steady_controls(ui);
+            self.show_rows(ui, current)
+        })
+        .inner
+    }
+
+    fn show_rows(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
         if !self.filter.trim().is_empty() {
             return self.show_filtered(ui, current);
         }
