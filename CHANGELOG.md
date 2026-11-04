@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.14 — 2026-11-04
+
 ### Fixed
 
 - Hovering a row of the folder tree no longer shifts it and its neighbours by a pixel with skins

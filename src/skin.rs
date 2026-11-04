@@ -758,8 +758,10 @@ mod steady_tests {
         let ctx = egui::Context::default();
         let size = std::cell::Cell::new((egui::Vec2::ZERO, egui::Pos2::ZERO));
         let run = |pointer: Option<egui::Pos2>| {
-            let mut input = egui::RawInput::default();
-            input.screen_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0)));
+            let mut input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0))),
+                ..Default::default()
+            };
             input.events.push(match pointer {
                 Some(p) => egui::Event::PointerMoved(p),
                 None => egui::Event::PointerGone,

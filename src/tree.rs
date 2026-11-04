@@ -507,9 +507,11 @@ mod tests {
         ctx.options_mut(|o| o.warn_on_id_clash = true);
         let mut clashes = Vec::new();
         for frame in 0..40 {
-            let mut input = egui::RawInput::default();
-            input.screen_rect = Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 600.0)));
-            input.time = Some(frame as f64 * 0.05);
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 600.0))),
+                time: Some(frame as f64 * 0.05),
+                ..Default::default()
+            };
             let out = ctx.run_ui(input, |ui| {
                 tree.poll();
                 egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
@@ -517,10 +519,10 @@ mod tests {
                 });
             });
             for s in &out.shapes {
-                if let egui::epaint::Shape::Text(t) = &s.shape {
-                    if t.galley.text().contains('\u{1F525}') {
-                        clashes.push(format!("frame {frame}: {}", t.galley.text()));
-                    }
+                if let egui::epaint::Shape::Text(t) = &s.shape
+                    && t.galley.text().contains('\u{1F525}')
+                {
+                    clashes.push(format!("frame {frame}: {}", t.galley.text()));
                 }
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
