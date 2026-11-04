@@ -599,8 +599,7 @@ mod tests {
 
     /// One frame of the tree's filter box and list, with `events` pressed.
     fn frame(ctx: &egui::Context, tree: &mut FolderTree, events: Vec<egui::Event>) -> Option<PathBuf> {
-        let mut input = egui::RawInput::default();
-        input.events = events;
+        let input = egui::RawInput { events, ..Default::default() };
         let mut opened = None;
         let _ = ctx.run_ui(input, |ui| {
             tree.poll();
