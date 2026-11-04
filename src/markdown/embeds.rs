@@ -338,8 +338,8 @@ pub fn image(
         if !image.alt.is_empty() {
             // Wrapped to the image's width, however the layout is aligned.
             let wrap = shown_width.max(240.0).min(width);
-            ui.scope(|ui| {
-                ui.set_max_width(wrap);
+            ui.allocate_ui(egui::vec2(wrap, 0.0), |ui| {
+                ui.set_width(wrap);
                 ui.add(egui::Label::new(RichText::new(&image.alt).small().weak()).wrap());
             });
         }
@@ -352,7 +352,7 @@ pub fn image(
             .font(egui::TextStyle::Small)
             .text_color(ui.visuals().weak_text_color())
             .frame(egui::Frame::NONE)
-            .desired_width(width),
+            .desired_width(shown_width.max(240.0).min(width)),
     );
     if alt.changed() {
         // Edited: written as markdown from now on.
