@@ -11,7 +11,7 @@ use super::model::{Align, Image, Table};
 
 /// Images are shown at their own size, scaled down to fit the column and,
 /// for tall ones, this height.
-const IMAGE_MAX_HEIGHT: f32 = 640.0;
+const IMAGE_MAX_HEIGHT: f32 = 1600.0;
 
 #[derive(Default)]
 pub struct EmbedResponse {
