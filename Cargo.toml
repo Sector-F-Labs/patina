@@ -22,7 +22,7 @@ highlight = ["dep:syntect", "dep:two-face"]
 [dependencies]
 egui = "0.35"
 pulldown-cmark = { version = "0.13", default-features = false, optional = true }
-egui_extras = { version = "0.35", features = ["file", "image", "gif", "webp", "svg"], optional = true }
+egui_extras = { version = "0.35", features = ["file", "image", "gif", "webp", "svg_text"], optional = true }
 syntect = { version = "5.3", default-features = false, features = ["default-fancy"], optional = true }
 # bat's syntaxes, precompiled: syntect's and TOML, TypeScript, Dockerfile...
 two-face = { version = "0.4", default-features = false, features = ["syntect-fancy"], optional = true }

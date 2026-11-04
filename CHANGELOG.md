@@ -13,7 +13,7 @@ is added there in the same commit (ADR-0025).
 
 ### Added
 
-- Markdown shows SVG images, and an `<img src=".." alt="..">` tag alone on its line as an image,
+- Markdown shows SVG images (with their text), and an `<img src=".." alt="..">` tag alone on its line as an image,
   like `![alt](src)`; the tag is written back as it was until its description is edited.
   `markdown::model::Image` has a new `html` field: an app that builds one sets it to `None`.
 - `FolderTree::lister(..)`: the tree lists folders from a function you give it instead of this
