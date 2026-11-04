@@ -310,6 +310,7 @@ pub fn image(
     } else {
         format!("{}\n{}", image.title, image.src)
     };
+    let shown_width = shown.rect.width();
     shown.on_hover_text(hint).context_menu(|ui| {
         if ui.button("Open Image").clicked() {
             // A local file in the image viewer, not the web browser.
@@ -336,7 +337,7 @@ pub fn image(
     if !editable {
         if !image.alt.is_empty() {
             // Wrapped to the image's width, however the layout is aligned.
-            let wrap = shown.rect.width().max(240.0).min(width);
+            let wrap = shown_width.max(240.0).min(width);
             ui.scope(|ui| {
                 ui.set_max_width(wrap);
                 ui.add(egui::Label::new(RichText::new(&image.alt).small().weak()).wrap());
