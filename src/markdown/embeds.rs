@@ -348,6 +348,10 @@ pub fn image(
             .frame(egui::Frame::NONE)
             .desired_width(width),
     );
+    if alt.changed() {
+        // Edited: written as markdown from now on.
+        image.html = None;
+    }
     out.changed = alt.changed();
     out
 }
