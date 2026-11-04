@@ -1362,12 +1362,16 @@ impl Editor {
                                 egui::pos2(free.min.x - self.image_room, free.min.y),
                                 egui::pos2(free.max.x + self.image_room, free.max.y),
                             );
+                            // A child that isn't allocated in this ui, so the page's
+                            // width doesn't grow to hold it: only its height is.
                             let layout = egui::Layout::top_down(egui::Align::Center);
-                            ui.scope_builder(
+                            let mut child = ui.new_child(
                                 egui::UiBuilder::new().max_rect(wide).layout(layout),
-                                |ui| embeds::image(ui, image, dir, id, editable),
-                            )
-                            .inner
+                            );
+                            let out = embeds::image(&mut child, image, dir, id, editable);
+                            let height = child.min_rect().height();
+                            ui.allocate_space(vec2(free.width(), height));
+                            out
                         } else {
                             embeds::image(ui, image, dir, id, editable)
                         }
