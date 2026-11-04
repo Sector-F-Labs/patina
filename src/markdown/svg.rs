@@ -56,6 +56,12 @@ impl BytesLoader for SvgFiles {
 /// `svg` with its `var(--name)`s replaced by the values `:root` gives them,
 /// overridden by the dark `@media` block when `dark`.
 pub fn resolve(svg: &str, dark: bool) -> String {
+    // The rasteriser maps `sans-serif` and `monospace` to Arial and Courier
+    // New, which a Linux machine often lacks: name families it may have.
+    let svg = svg
+        .replace(",sans-serif", ",Noto Sans,DejaVu Sans,Liberation Sans,Ubuntu,Cantarell,sans-serif")
+        .replace(",monospace", ",DejaVu Sans Mono,Liberation Mono,Noto Sans Mono,Ubuntu Mono,monospace");
+    let svg = svg.as_str();
     if !svg.contains("var(") {
         return svg.to_string();
     }
@@ -115,5 +121,6 @@ mod tests {
     #[test]
     fn an_svg_without_variables_is_unchanged() {
         assert_eq!(resolve("<svg/>", true), "<svg/>");
+        assert!(resolve("<text style=\"font-family:a,sans-serif\"/>", true).contains("Noto Sans"));
     }
 }
