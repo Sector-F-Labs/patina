@@ -59,6 +59,12 @@ pub struct FolderTree {
     lister: Option<Lister>,
     /// What the filter box holds: only names containing it are shown.
     filter: String,
+    /// The filter's match the keyboard is on, from the top.
+    cursor: usize,
+    /// Enter was pressed in the filter box: open the match under the cursor.
+    open_cursor: bool,
+    /// The cursor moved: scroll it into view.
+    cursor_moved: bool,
 }
 
 /// Folders listed at once while a filter looks through the whole tree.
@@ -84,6 +90,9 @@ impl FolderTree {
             files: false,
             lister: None,
             filter: String::new(),
+            cursor: 0,
+            open_cursor: false,
+            cursor_moved: false,
         }
     }
 
@@ -107,15 +116,40 @@ impl FolderTree {
     /// listed are listed to look inside them. Escape empties it. Whether the
     /// text changed.
     pub fn filter_box(&mut self, ui: &mut egui::Ui) -> bool {
+        use egui::{Key, Modifiers};
+        let id = egui::Id::new("folder_tree_filter");
+        let mut changed = false;
+        // Keys that move through the matches, taken before the box sees them.
+        if ui.memory(|m| m.has_focus(id)) && !self.filter.trim().is_empty() {
+            let step = ui.input_mut(|i| {
+                let down = i.consume_key(Modifiers::CTRL, Key::N) || i.consume_key(Modifiers::NONE, Key::ArrowDown);
+                let up = i.consume_key(Modifiers::CTRL, Key::P) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+                i64::from(down) - i64::from(up)
+            });
+            if step != 0 {
+                self.cursor = self.cursor.saturating_add_signed(step as isize);
+                self.cursor_moved = true;
+            }
+        }
         let edit = egui::TextEdit::singleline(&mut self.filter)
+            .id(id)
             .hint_text("Filter files")
             .desired_width(f32::INFINITY);
         let resp = ui.add(edit);
-        if resp.has_focus() && ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        if resp.has_focus() && ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
             self.filter.clear();
-            return true;
+            changed = true;
         }
-        resp.changed()
+        if resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+            self.open_cursor = true;
+            // Back in the box, to go on typing.
+            resp.request_focus();
+        }
+        if resp.changed() || changed {
+            self.cursor = 0;
+            changed = true;
+        }
+        changed
     }
 
     /// Sets the filter, as typing in [`Self::filter_box`] does.
@@ -196,18 +230,23 @@ impl FolderTree {
     /// The filter's matches as a flat list: each name with the folder it's
     /// in, dimmed, beside it. Looks in each folder below the root, listing
     /// those not listed yet a few at a time.
-    fn show_filtered(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
+    fn show_filtered(&mut self, ui: &mut egui::Ui, _current: &Path) -> Option<PathBuf> {
         let query = self.filter.clone();
         let (found, pending) = self.scan(&query, ui.ctx());
         let mut clicked = None;
-        for item in found.iter().take(SHOWN_AT_MOST) {
+        let shown = found.len().min(SHOWN_AT_MOST);
+        self.cursor = self.cursor.min(shown.saturating_sub(1));
+        if std::mem::take(&mut self.open_cursor) {
+            clicked = found.get(self.cursor).map(|item| item.path.clone());
+        }
+        for (n, item) in found.iter().take(SHOWN_AT_MOST).enumerate() {
             let dir = item.path.parent().and_then(|d| d.strip_prefix(&self.root).ok());
             let icon = if item.folder { "\u{1F4C1}" } else { "\u{1F4C4}" };
             // The name, and under it the folder it's in, dimmed.
             let resp = ui
                 .vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 0.0;
-                    let resp = ui.selectable_label(item.path == current, format!("{icon} {}", item.name));
+                    let resp = ui.selectable_label(n == self.cursor, format!("{icon} {}", item.name));
                     if let Some(dir) = dir.filter(|d| !d.as_os_str().is_empty()) {
                         let dir = format!("      {}", dir.display());
                         ui.label(egui::RichText::new(dir).weak().small());
@@ -218,6 +257,10 @@ impl FolderTree {
                 .on_hover_text(item.path.display().to_string());
             if resp.clicked() {
                 clicked = Some(item.path.clone());
+                self.cursor = n;
+            }
+            if n == self.cursor && std::mem::take(&mut self.cursor_moved) {
+                resp.scroll_to_me(None);
             }
         }
         if found.len() > SHOWN_AT_MOST {
@@ -552,6 +595,58 @@ mod tests {
         assert_eq!(fuzzy("HOW-IT-WORKS.md", "hw"), None);
         assert_eq!(fuzzy("README.md", "how it works"), None);
         assert_eq!(fuzzy("README.md", "  "), None);
+    }
+
+    /// One frame of the tree's filter box and list, with `events` pressed.
+    fn frame(ctx: &egui::Context, tree: &mut FolderTree, events: Vec<egui::Event>) -> Option<PathBuf> {
+        let mut input = egui::RawInput::default();
+        input.events = events;
+        let mut opened = None;
+        let _ = ctx.run_ui(input, |ui| {
+            tree.poll();
+            tree.filter_box(ui);
+            opened = tree.show(ui, Path::new(""));
+        });
+        opened
+    }
+
+    fn press(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
+        egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers }
+    }
+
+    #[test]
+    fn ctrl_n_and_p_move_through_matches_and_enter_opens() {
+        let dir = std::env::temp_dir().join(format!("patina-tree-keys-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for f in ["a.rs", "b.rs", "c.rs"] {
+            std::fs::write(dir.join(f), b"").unwrap();
+        }
+        let mut tree = FolderTree::new(dir.clone(), "p".into()).files(true);
+        tree.set_filter(".rs");
+        let ctx = egui::Context::default();
+        ctx.memory_mut(|m| m.request_focus(egui::Id::new("folder_tree_filter")));
+        let none = egui::Modifiers::NONE;
+        // Let the folder be listed.
+        for _ in 0..100 {
+            frame(&ctx, &mut tree, vec![]);
+            if !tree.scan(".rs", &ctx).1 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        frame(&ctx, &mut tree, vec![]);
+        frame(&ctx, &mut tree, vec![press(egui::Key::N, egui::Modifiers::CTRL)]);
+        frame(&ctx, &mut tree, vec![press(egui::Key::N, egui::Modifiers::CTRL)]);
+        frame(&ctx, &mut tree, vec![press(egui::Key::P, egui::Modifiers::CTRL)]);
+        assert_eq!(tree.cursor, 1);
+        frame(&ctx, &mut tree, vec![press(egui::Key::ArrowDown, none)]);
+        frame(&ctx, &mut tree, vec![press(egui::Key::ArrowDown, none)]);
+        assert_eq!(tree.cursor, 2, "stops at the last match");
+        frame(&ctx, &mut tree, vec![press(egui::Key::ArrowUp, none)]);
+        let opened = frame(&ctx, &mut tree, vec![press(egui::Key::Enter, none)]);
+        assert_eq!(opened, Some(dir.join("b.rs")));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
