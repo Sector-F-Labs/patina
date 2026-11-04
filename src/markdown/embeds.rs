@@ -335,7 +335,12 @@ pub fn image(
     });
     if !editable {
         if !image.alt.is_empty() {
-            ui.label(RichText::new(&image.alt).small().weak());
+            // Wrapped to the image's width, however the layout is aligned.
+            let wrap = shown.rect.width().max(240.0).min(width);
+            ui.scope(|ui| {
+                ui.set_max_width(wrap);
+                ui.add(egui::Label::new(RichText::new(&image.alt).small().weak()).wrap());
+            });
         }
         return out;
     }
