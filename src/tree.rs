@@ -103,7 +103,7 @@ impl FolderTree {
 
     /// A box for the filter, to go above [`Self::show`]: as it's typed in, the
     /// tree gives way to a flat list of the files (and folders) whose names contain it,
-    /// whatever the case, each with its folder. Folders not yet
+    /// however they're written (`how it works` finds `HOW-IT-WORKS.md`), each with its folder. Folders not yet
     /// listed are listed to look inside them. Escape empties it. Whether the
     /// text changed.
     pub fn filter_box(&mut self, ui: &mut egui::Ui) -> bool {
@@ -197,8 +197,8 @@ impl FolderTree {
     /// in, dimmed, beside it. Looks in each folder below the root, listing
     /// those not listed yet a few at a time.
     fn show_filtered(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
-        let needle = self.filter.trim().to_lowercase();
-        let (found, pending) = self.scan(&needle, ui.ctx());
+        let query = self.filter.clone();
+        let (found, pending) = self.scan(&query, ui.ctx());
         let mut clicked = None;
         for item in found.iter().take(SHOWN_AT_MOST) {
             let dir = item.path.parent().and_then(|d| d.strip_prefix(&self.root).ok());
@@ -235,17 +235,17 @@ impl FolderTree {
         clicked
     }
 
-    /// The entries below the root whose names contain `needle` (lower case),
-    /// by name, from what's listed; whether folders are still to be listed.
+    /// The entries below the root whose names match `query` ([`fuzzy`]), best
+    /// first, from what's listed; whether folders are still to be listed.
     /// Asks for some of those.
-    fn scan(&mut self, needle: &str, ctx: &egui::Context) -> (Vec<Item>, bool) {
+    fn scan(&mut self, query: &str, ctx: &egui::Context) -> (Vec<Item>, bool) {
         let mut busy = self
             .children
             .values()
             .filter(|c| matches!(c, Children::Loading))
             .count();
         let mut pending = busy > 0;
-        let mut found = Vec::new();
+        let mut found: Vec<(Rank, Item)> = Vec::new();
         let mut stack = vec![(self.root.clone(), 0)];
         while let Some((dir, depth)) = stack.pop() {
             match self.children.get(&dir) {
@@ -258,8 +258,8 @@ impl FolderTree {
                 }
                 Some(Children::Loaded(list)) => {
                     for item in list {
-                        if item.name.to_lowercase().contains(needle) {
-                            found.push(item.clone());
+                        if let Some(rank) = fuzzy(&item.name, query) {
+                            found.push((rank, item.clone()));
                         }
                         let skipped = SCAN_SKIPS.contains(&item.name.as_str())
                             && !self.children.contains_key(&item.path);
@@ -271,8 +271,8 @@ impl FolderTree {
                 Some(Children::Loading | Children::Failed(_)) => {}
             }
         }
-        found.sort_by_key(|item| (item.name.to_lowercase(), item.path.clone()));
-        (found, pending)
+        found.sort_by_key(|(rank, item)| (*rank, item.name.len(), item.name.to_lowercase(), item.path.clone()));
+        (found.into_iter().map(|(_, item)| item).collect(), pending)
     }
 
     fn node(
@@ -370,6 +370,33 @@ impl FolderTree {
             self.reveal = None;
         }
     }
+}
+
+/// How well a name matches a filter: lower is better.
+type Rank = u8;
+
+/// Whether `name` matches `query`, and how well. Case, and whether words are
+/// parted by a space, dash, dot or underscore, don't matter, so `how it
+/// works` finds `HOW-IT-WORKS.md`. Best: the query's letters run together in
+/// the name; then each word of the query somewhere in it, in any order; then
+/// the query's letters in order with others between (three or more).
+fn fuzzy(name: &str, query: &str) -> Option<Rank> {
+    let letters = |s: &str| -> Vec<char> {
+        s.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect()
+    };
+    let (want, have) = (letters(query), letters(name));
+    if want.is_empty() {
+        return None;
+    }
+    if have.windows(want.len()).any(|w| w == want.as_slice()) {
+        return Some(0);
+    }
+    let lower = name.to_lowercase();
+    if query.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).all(|w| lower.contains(&w.to_lowercase())) {
+        return Some(1);
+    }
+    let mut at = have.iter();
+    (want.len() >= 3 && want.iter().all(|c| at.any(|h| h == c))).then_some(2)
 }
 
 /// Subfolders of `dir`, then with `files` its files, each sorted
@@ -511,6 +538,20 @@ mod tests {
         // Only the matches, by name, whatever folder they're in.
         assert_eq!(names, ["docs/needle.md", "src/deep/Needle.rs"]);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_filter_is_fuzzy() {
+        // Case and separators don't matter.
+        assert_eq!(fuzzy("HOW-IT-WORKS.md", "how it works"), Some(0));
+        assert_eq!(fuzzy("HOW-IT-WORKS.md", "howitworks"), Some(0));
+        assert_eq!(fuzzy("how_it_works.md", "How-It"), Some(0));
+        // Words in any order, then letters in order.
+        assert_eq!(fuzzy("HOW-IT-WORKS.md", "works how"), Some(1));
+        assert_eq!(fuzzy("HOW-IT-WORKS.md", "hwrk"), Some(2));
+        assert_eq!(fuzzy("HOW-IT-WORKS.md", "hw"), None);
+        assert_eq!(fuzzy("README.md", "how it works"), None);
+        assert_eq!(fuzzy("README.md", "  "), None);
     }
 
     #[test]

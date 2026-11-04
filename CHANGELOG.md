@@ -17,7 +17,7 @@ is added there in the same commit (ADR-0025).
   like `![alt](src)`; the tag is written back as it was until its description is edited.
   `markdown::model::Image` has a new `html` field: an app that builds one sets it to `None`.
 - `FolderTree::filter_box(ui)`: a filter box for above the tree; typing replaces the tree with a flat
-  list of the names that match, each with its folder, looking in folders not yet listed. `set_filter`, `filter`.
+  list of the names that match, fuzzily (case, spaces and dashes don't matter), each with its folder, looking in folders not yet listed. `set_filter`, `filter`.
   Nothing changes for an app that doesn't call it.
 - `markdown::Editor::set_image_room(room)`: images wider than the text may reach `room` points past
   each side of it, centred. Off unless an app calls it.
