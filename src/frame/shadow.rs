@@ -37,8 +37,8 @@ impl Default for Style {
     fn default() -> Self {
         Self {
             blur: 8.0,
-            drop: 6.0,
-            opacity: 0.45,
+            drop: 3.0,
+            opacity: 0.5,
         }
     }
 }
