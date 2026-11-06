@@ -11,6 +11,11 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Fixed
+
+- A local image in the markdown editor shows its file again when another program changes it (checked
+  twice a second while shown), instead of staying as first loaded until the app restarts.
+
 ## 0.1.14 — 2026-11-04
 
 ### Fixed

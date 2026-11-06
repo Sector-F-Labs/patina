@@ -285,6 +285,7 @@ pub fn image(
     let mut out = EmbedResponse::default();
     let uri = image_uri(&image.src, dir);
     let width = ui.available_width();
+    refresh_if_changed(ui.ctx(), &uri);
     let missing = uri
         .strip_prefix("file://")
         .is_some_and(|path| !Path::new(path).exists());
@@ -489,6 +490,31 @@ fn percent_decode(src: &str) -> String {
         }
     }
     String::from_utf8(out).unwrap_or_else(|_| src.to_string())
+}
+
+/// How often a shown local image's file is looked at for a change, in seconds.
+const IMAGE_POLL: f64 = 0.5;
+
+/// Makes egui load a local image again when its file has changed since it was
+/// shown, which its loaders would never do (they keep it by URI). Looks at most
+/// every `IMAGE_POLL` seconds, and asks for a frame then so a change is seen
+/// without any input.
+fn refresh_if_changed(ctx: &egui::Context, uri: &str) {
+    let Some(path) = uri.strip_prefix("file://") else { return };
+    let now = ctx.input(|i| i.time);
+    let key = Id::new(("image-seen", uri));
+    let (checked, seen): (f64, Option<std::time::SystemTime>) =
+        ctx.data(|d| d.get_temp(key)).unwrap_or((f64::NEG_INFINITY, None));
+    if now - checked < IMAGE_POLL {
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(IMAGE_POLL - (now - checked)));
+        return;
+    }
+    let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok();
+    if seen.is_some() && modified != seen {
+        ctx.forget_image(uri);
+    }
+    ctx.data_mut(|d| d.insert_temp(key, (now, modified)));
+    ctx.request_repaint_after(std::time::Duration::from_secs_f64(IMAGE_POLL));
 }
 
 /// The URI egui loads an image's `src` from: URLs as they are, paths as
