@@ -34,7 +34,8 @@ does, through `raw-window-handle`. That is why the call can't happen inside `Tit
   the window's size, black, moved down a little. The tiles also reach 16 px in under the window,
   past its corner radius: the corners are transparent, and without shadow behind them each showed
   a notch of what lies below. `request_styled` takes a `Style` (blur 8,
-  drop 3, opacity 0.5 by default: measured on a white background, the sides, bottom and top of
+  drop 3, opacity 0.5 by default, and a `spread`, a sideways `offset_x` and a `color`, which the
+  HUD's settings change (patina-desktop's ADR-0113): measured on a white background, the sides, bottom and top of
   Firefox's focused shadow are 61, 79 and 44 of 255 dark, and these give about the same).
 - **`tiles(style)` is public,** for a client that has Wayland objects of its own and no eframe
   `Frame`: patina-shell attaches them to the HUD's layer surfaces (patina-desktop's ADR-0113).

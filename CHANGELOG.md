@@ -16,6 +16,8 @@ is added there in the same commit (ADR-0025).
 - `frame::shadow::request(&frame)` asks the compositor to draw a drop shadow around the window,
   through KDE's `org_kde_kwin_shadow` protocol (the Patina compositor and KWin draw it; others
   show nothing). `request_styled` takes a `shadow::Style` (ADR-0030).
+- `shadow::Style` also has `spread`, `offset_x` and `color` (a grown or shrunk shape, a sideways move and
+  a tint), with defaults that look as before; build one with `..Style::default()`.
 - `frame::shadow::tiles(style)` is public: the eight tiles and offsets a client with Wayland objects of
   its own attaches to a surface (patina-shell does, for the HUD's layer surfaces).
 

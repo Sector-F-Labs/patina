@@ -31,6 +31,13 @@ pub struct Style {
     /// How dark it is where it meets the window's edge, 0 to 1 (half of it,
     /// there; the blur is half in, half out).
     pub opacity: f32,
+    /// How far the shadow's shape is grown beyond the window's on every side
+    /// before it is blurred; negative shrinks it.
+    pub spread: f32,
+    /// How far the shadow is moved to the right; negative moves it left.
+    pub offset_x: f32,
+    /// Its colour, red, green and blue.
+    pub color: [u8; 3],
 }
 
 impl Default for Style {
@@ -39,9 +46,16 @@ impl Default for Style {
             blur: 8.0,
             drop: 3.0,
             opacity: 0.5,
+            spread: 0.0,
+            offset_x: 0.0,
+            color: [0, 0, 0],
         }
     }
 }
+
+/// The most any of a style's sizes is taken to be, in pixels: tiles stay
+/// small whatever a config says.
+const MOST: f32 = 64.0;
 
 /// Asks the compositor to draw `window`'s shadow, in the default [`Style`].
 /// Does nothing on other systems than Linux on Wayland, with a compositor
@@ -81,27 +95,43 @@ pub type Tile = (i32, i32, Vec<u8>);
 /// tiles to a surface of its own, as patina-shell does for a layer surface;
 /// an app with eframe's `Frame` uses [`request`].
 pub fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
-    let sigma = style.blur.max(0.5);
-    let reach = (sigma * 3.0).ceil() as i32;
-    let shift = style.drop.round() as i32;
-    let (left, right) = (reach, reach);
-    let top = (reach - shift).max(1);
-    let bottom = reach + shift;
-    // The share of the shadow still there `d` pixels outside an edge: half
-    // at the edge, none far off.
+    let sigma = style.blur.clamp(0.5, MOST);
+    let spread = style.spread.clamp(-MOST, MOST);
+    let (sx, sy) = (
+        style.offset_x.clamp(-MOST, MOST),
+        style.drop.clamp(-MOST, MOST),
+    );
+    // How far past each edge the shadow is worth drawing: three deviations of
+    // the blur from the edge of its shape, which is `spread` out, and moved
+    // by the offset.
+    let reach = |toward: f32| ((sigma * 3.0 + spread + toward).ceil() as i32).max(1);
+    let (left, right) = (reach(-sx), reach(sx));
+    let (top, bottom) = (reach(-sy), reach(sy));
+    // The share of the shadow still there `d` pixels outside an edge of its
+    // shape: half at the edge, none far off.
     let share = |d: f32| 0.5 * erfc((d / (sigma * std::f32::consts::SQRT_2)) as f64) as f32;
+    let [red, green, blue] = style.color.map(f32::from);
     let pixel = |across_x: Option<f32>, across_y: Option<f32>| {
-        let a = style.opacity * across_x.map_or(1.0, &share) * across_y.map_or(1.0, &share);
-        // Black, so premultiplied it is just the alpha.
-        [0, 0, 0, (a.clamp(0.0, 1.0) * 255.0).round() as u8]
+        let a = (style.opacity * across_x.map_or(1.0, &share) * across_y.map_or(1.0, &share))
+            .clamp(0.0, 1.0);
+        // B, G, R, A in memory, each colour premultiplied by the alpha.
+        [
+            (blue * a).round() as u8,
+            (green * a).round() as u8,
+            (red * a).round() as u8,
+            (a * 255.0).round() as u8,
+        ]
     };
-    // How far outside the window's left, right, top and bottom edge a pixel
-    // is, negative under the window. A left or top tile starts `left` or `top`
-    // outside the edge; a right or bottom one starts `INSET` inside it.
-    let outside_left = |x: i32| (left - x) as f32 - 0.5;
-    let outside_right = |x: i32| (x - INSET) as f32 + 0.5;
-    let outside_top = |y: i32| (top - y) as f32 - 0.5 + shift as f32;
-    let outside_bottom = |y: i32| (y - INSET) as f32 + 0.5 - shift as f32;
+    // How far outside the shadow's shape, at the window's left, right, top
+    // and bottom edge, a pixel is, negative inside it. A left or top tile
+    // starts `left` or `top` outside the window's edge; a right or bottom one
+    // starts `INSET` inside it. The shape is `spread` bigger than the window
+    // and `sx`, `sy` over, which moves its edges toward one side and away
+    // from the other.
+    let outside_left = |x: i32| (left - x) as f32 - 0.5 + sx - spread;
+    let outside_right = |x: i32| (x - INSET) as f32 + 0.5 - sx - spread;
+    let outside_top = |y: i32| (top - y) as f32 - 0.5 + sy - spread;
+    let outside_bottom = |y: i32| (y - INSET) as f32 + 0.5 - sy - spread;
     let (wide_left, wide_right) = (left + INSET, right + INSET);
     let (tall_top, tall_bottom) = (top + INSET, bottom + INSET);
     let build = |w: i32, h: i32, f: &dyn Fn(i32, i32) -> [u8; 4]| {
@@ -371,5 +401,49 @@ mod tests {
         assert!(alpha(0, left as usize + INSET as usize - 1) > alpha(0, left as usize - 1));
         // The shadow sits lower: more of it under the window than over.
         assert!(bottom > top);
+    }
+
+    #[test]
+    fn the_default_style_is_what_it_always_was() {
+        let (_, offsets) = tiles(Style::default());
+        assert_eq!(offsets, [24, 21, 24, 27]);
+    }
+
+    #[test]
+    fn spread_and_sideways_offset_move_the_reach() {
+        let spread = Style {
+            spread: 4.0,
+            ..Style::default()
+        };
+        assert_eq!(tiles(spread).1, [28, 25, 28, 31]);
+        let right = Style {
+            offset_x: 5.0,
+            ..Style::default()
+        };
+        let (_, [left, _, right_reach, _]) = tiles(right);
+        assert_eq!((left, right_reach), (19, 29));
+    }
+
+    #[test]
+    fn colour_is_premultiplied_and_sizes_are_held_in_check() {
+        let red = Style {
+            color: [255, 0, 0],
+            opacity: 1.0,
+            ..Style::default()
+        };
+        let (red_tiles, [left, ..]) = tiles(red);
+        // Under the window, where the shadow is nearly all there is, a pixel
+        // is B, G, R, A: red as strong as the alpha, no blue or green.
+        let at = (left as usize + INSET as usize - 1) * 4;
+        let pixel = &red_tiles[0].2[at..at + 4];
+        assert_eq!((pixel[0], pixel[1]), (0, 0));
+        assert_eq!(pixel[2], pixel[3]);
+        assert!(pixel[3] > 200);
+        let huge = Style {
+            blur: 1.0e6,
+            spread: 1.0e6,
+            ..Style::default()
+        };
+        assert!(tiles(huge).0.iter().all(|(w, h, _)| *w <= 400 && *h <= 400));
     }
 }
