@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.15 — 2026-11-06
+
 ### Added
 
 - `frame::shadow::request(&frame)` asks the compositor to draw a drop shadow around the window,
