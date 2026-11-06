@@ -18,6 +18,8 @@ pub mod embeds;
 pub mod fonts;
 pub mod model;
 
+pub mod svg;
+
 pub use editor::Editor;
 
 /// Sets up a context for showing markdown: the fonts, and egui's image
@@ -25,4 +27,6 @@ pub use editor::Editor;
 pub fn install(ctx: &egui::Context) {
     fonts::install(ctx);
     egui_extras::install_image_loaders(ctx);
+    // After the others, so it is asked first: SVGs with their variables filled in.
+    ctx.add_bytes_loader(std::sync::Arc::new(svg::SvgFiles::default()));
 }

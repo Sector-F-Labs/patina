@@ -68,6 +68,9 @@ pub struct Image {
     pub alt: String,
     pub src: String,
     pub title: String,
+    /// The `<img ...>` tag it was read from, written back as it was until the
+    /// description is edited.
+    pub html: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -236,12 +239,58 @@ fn lone_image(events: &Events, start: usize) -> Option<(Image, usize)> {
             alt,
             src: dest_url.to_string(),
             title: title.to_string(),
+            html: None,
         },
         end + 1,
     ))
 }
 
+/// An `<img src=".." alt="..">` tag alone on its line, as an image.
+fn html_image(tag: &str) -> Option<Image> {
+    let tag = tag.trim();
+    let inner = tag.strip_prefix("<img")?.strip_suffix('>')?;
+    if !inner.starts_with(char::is_whitespace) || inner.contains('<') {
+        return None;
+    }
+    let inner = inner.trim_end().trim_end_matches('/');
+    let (mut src, mut alt, mut title) = (None, String::new(), String::new());
+    let mut rest = inner.trim_start();
+    while !rest.is_empty() {
+        let name_end = rest.find(|c: char| c == '=' || c.is_whitespace()).unwrap_or(rest.len());
+        let name = rest[..name_end].to_ascii_lowercase();
+        rest = rest[name_end..].trim_start();
+        let mut value = String::new();
+        if let Some(after) = rest.strip_prefix('=') {
+            let after = after.trim_start();
+            let (v, tail) = match after.chars().next() {
+                Some(q @ ('"' | '\'')) => {
+                    let body = &after[1..];
+                    let close = body.find(q)?;
+                    (&body[..close], &body[close + 1..])
+                }
+                _ => {
+                    let end = after.find(char::is_whitespace).unwrap_or(after.len());
+                    (&after[..end], &after[end..])
+                }
+            };
+            value = v.replace("&quot;", "\"").replace("&amp;", "&");
+            rest = tail.trim_start();
+        }
+        match name.as_str() {
+            "src" => src = Some(value),
+            "alt" => alt = value,
+            "title" => title = value,
+            _ => {}
+        }
+    }
+    let src = src.filter(|s| !s.is_empty())?;
+    Some(Image { alt, src, title, html: Some(tag.to_string()) })
+}
+
 fn image_markdown(image: &Image) -> String {
+    if let Some(html) = &image.html {
+        return html.clone();
+    }
     let title = match image.title.as_str() {
         "" => String::new(),
         t => format!(" \"{}\"", t.replace('"', "\\\"")),
@@ -472,6 +521,17 @@ pub fn parse(src: &str) -> Vec<Line> {
                     im.finish_line();
                     im.push(Line::new(Block::Table(parse_table(&events, i, src))));
                     i = matching_end(&events, i);
+                }
+                Tag::HtmlBlock
+                    if im.lists.is_empty()
+                        && im.quotes == 0
+                        && matching_end(&events, i) == i + 2
+                        && matches!(&events[i + 1].0, Event::Html(h) if html_image(h).is_some()) =>
+                {
+                    let Event::Html(h) = &events[i + 1].0 else { unreachable!() };
+                    im.finish_line();
+                    im.push(Line::new(Block::Image(html_image(h).expect("checked above"))));
+                    i += 2;
                 }
                 _ => {
                     // HTML blocks, footnote definitions, front matter...
@@ -856,7 +916,8 @@ mod tests {
             Block::Image(Image {
                 alt: "A cat".into(),
                 src: "pics/cat%20one.png".into(),
-                title: "Tabby".into()
+                title: "Tabby".into(),
+                html: None,
             })
         );
         assert_eq!(
@@ -945,5 +1006,18 @@ mod tests {
             },
         ];
         assert_eq!(inline_markdown(&spans), "**bold** plain");
+    }
+
+    #[test]
+    fn an_img_tag_on_its_own_line_is_an_image_and_stays_as_written() {
+        let src = "Before\n\n<img src=\"images/a.svg\" alt=\"A b\" width=\"300\">\n\nAfter\n";
+        let lines = parse("<img src=\"images/a.svg\" alt='The a'>\n");
+        let Block::Image(image) = &lines[0].block else { panic!("{:?}", lines[0].block) };
+        assert_eq!((image.src.as_str(), image.alt.as_str()), ("images/a.svg", "The a"));
+        assert_eq!(roundtrip(src), src);
+        assert!(matches!(parse(src)[1].block, Block::Image(_)));
+        // Other HTML stays raw.
+        assert!(!matches!(parse("<img alt=x>\n")[0].block, Block::Image(_)));
+        assert!(!matches!(parse("<div><img src=\"a.png\"></div>\n")[0].block, Block::Image(_)));
     }
 }

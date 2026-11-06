@@ -200,6 +200,8 @@ pub struct Editor {
     focus_code: Option<usize>,
     /// The note's folder, which relative image paths start from.
     dir: Option<PathBuf>,
+    /// How far past each side of the text an image may reach, if it's wider.
+    image_room: f32,
     /// Only showing: no edits, no caret; links are followed by the app.
     read_only: bool,
     /// A link clicked while read-only, for the app to follow.
@@ -231,6 +233,7 @@ impl Editor {
             scroll_to_cursor: false,
             focus_code: None,
             dir: None,
+            image_room: 0.0,
             read_only: false,
             link: None,
             search: Vec::new(),
@@ -317,6 +320,13 @@ impl Editor {
     /// Sets the folder relative image paths are found from: the note's.
     pub fn set_dir(&mut self, dir: Option<PathBuf>) {
         self.dir = dir;
+    }
+
+    /// Lets images wider than the text reach `room` points past each side of
+    /// it (the page's margin), centred, so diagrams aren't squeezed to a
+    /// readable line length.
+    pub fn set_image_room(&mut self, room: f32) {
+        self.image_room = room.max(0.0);
     }
 
     /// Replaces the document with `md`, clearing undo history.
@@ -1343,13 +1353,29 @@ impl Editor {
                     Para::Code { lang, code } => {
                         embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
                     }
-                    Para::Image(image) => embeds::image(
-                        ui,
-                        image,
-                        self.dir.as_deref(),
-                        self.id.with(("image", i)),
-                        !self.read_only,
-                    ),
+                    Para::Image(image) => {
+                        let (dir, id, editable) =
+                            (self.dir.as_deref(), self.id.with(("image", i)), !self.read_only);
+                        if self.image_room > 0.0 {
+                            let free = ui.available_rect_before_wrap();
+                            let wide = Rect::from_min_max(
+                                egui::pos2(free.min.x - self.image_room, free.min.y),
+                                egui::pos2(free.max.x + self.image_room, free.max.y),
+                            );
+                            // A child that isn't allocated in this ui, so the page's
+                            // width doesn't grow to hold it: only its height is.
+                            let layout = egui::Layout::top_down(egui::Align::Center);
+                            let mut child = ui.new_child(
+                                egui::UiBuilder::new().max_rect(wide).layout(layout),
+                            );
+                            let out = embeds::image(&mut child, image, dir, id, editable);
+                            let height = child.min_rect().height();
+                            ui.allocate_space(vec2(free.width(), height));
+                            out
+                        } else {
+                            embeds::image(ui, image, dir, id, editable)
+                        }
+                    }
                     Para::Text(_) => unreachable!(),
                 };
                 if response.changed {

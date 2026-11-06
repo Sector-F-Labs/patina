@@ -9,6 +9,55 @@ Sector F apps build on `develop`, so they get changes before a release: after
 `cargo update -p patina-ui`, read **Unreleased** as well. Each change that alters what apps write
 is added there in the same commit (ADR-0025).
 
+## Unreleased
+
+## 0.1.15 — 2026-11-06
+
+### Added
+
+- `frame::shadow::request(&frame)` asks the compositor to draw a drop shadow around the window,
+  through KDE's `org_kde_kwin_shadow` protocol (the Patina compositor and KWin draw it; others
+  show nothing). `request_styled` takes a `shadow::Style` (ADR-0030).
+- `shadow::Style` also has `spread`, `offset_x` and `color` (a grown or shrunk shape, a sideways move and
+  a tint), with defaults that look as before; build one with `..Style::default()`.
+- `frame::shadow::tiles(style)` is public: the eight tiles and offsets a client with Wayland objects of
+  its own attaches to a surface (patina-shell does, for the HUD's layer surfaces).
+
+### Upgrading
+
+- **Apps that draw their own frame: call `patina::frame::shadow::request(frame)` from
+  `App::ui`,** with eframe's `Frame`, when the frame is the app's own (ADR-0030). Without it the
+  window has no shadow; nothing else changes.
+
+### Fixed
+
+- A local image in the markdown editor shows its file again when another program changes it (checked
+  twice a second while shown), instead of staying as first loaded until the app restarts.
+
+## 0.1.14 — 2026-11-04
+
+### Fixed
+
+- Hovering a row of the folder tree no longer shifts it and its neighbours by a pixel with skins
+  that stroke their controls, and the borders stay: a control is one size idle, hovered or pressed
+  whatever its border. New `skin::steady_controls(ui)` does the same for an app's own lists
+  of `selectable_label`s, such as a sidebar.
+
+### Added
+
+- Markdown shows SVG images (with their text), and an `<img src=".." alt="..">` tag alone on its line as an image,
+  like `![alt](src)`; the tag is written back as it was until its description is edited.
+  `markdown::model::Image` has a new `html` field: an app that builds one sets it to `None`.
+- `FolderTree::filter_box(ui)`: a filter box for above the tree; typing replaces the tree with a flat
+  list of the names that match, fuzzily (case, spaces and dashes don't matter), each with its folder, looking in folders not yet listed. Ctrl+P and Ctrl+N (or Up and Down)
+  move through the matches, Enter opens the one marked (`show` returns it). `set_filter`, `filter`.
+  Nothing changes for an app that doesn't call it.
+- `markdown::Editor::set_image_room(room)`: images wider than the text may reach `room` points past
+  each side of it, centred. Off unless an app calls it.
+- `FolderTree::lister(..)`: the tree lists folders from a function you give it instead of this
+  machine's disk, for a project on another machine (`tree::Lister`, `tree::Entry`; Programmer's
+  ADR-0030). Nothing changes for an app that doesn't call it.
+
 ## 0.1.13 — 2026-10-28
 
 ### Added

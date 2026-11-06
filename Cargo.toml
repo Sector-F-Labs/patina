@@ -1,6 +1,6 @@
 [package]
 name = "patina-ui"
-version = "0.1.13"
+version = "0.1.15"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "Patina: the window frame, components and design language shared by Photograph, UnAmp and other egui desktop apps"
@@ -22,7 +22,7 @@ highlight = ["dep:syntect", "dep:two-face"]
 [dependencies]
 egui = "0.35"
 pulldown-cmark = { version = "0.13", default-features = false, optional = true }
-egui_extras = { version = "0.35", features = ["file", "image", "gif", "webp"], optional = true }
+egui_extras = { version = "0.35", features = ["file", "image", "gif", "webp", "svg_text"], optional = true }
 syntect = { version = "5.3", default-features = false, features = ["default-fancy"], optional = true }
 # bat's syntaxes, precompiled: syntect's and TOML, TypeScript, Dockerfile...
 two-face = { version = "0.4", default-features = false, features = ["syntect-fancy"], optional = true }
@@ -32,9 +32,15 @@ serde = { version = "1", features = ["derive"] }
 serde_ignored = "0.1"
 toml = "1"
 zbus = "5"
+raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "0.2"
+# The window shadow (src/shadow.rs): the protocol on the toolkit's own connection.
+wayland-client = "0.31"
+# dlopen, as winit has it: libwayland-client is loaded when the app runs, not needed to build.
+wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
+wayland-protocols-plasma = { version = "0.3", default-features = false, features = ["client"] }
 
 [dev-dependencies]
 eframe = "0.35"
