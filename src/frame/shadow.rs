@@ -65,8 +65,7 @@ pub fn request_styled(window: &(impl HasWindowHandle + HasDisplayHandle), style:
 const INSET: i32 = 16;
 
 /// One tile: its width, its height and its pixels.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-type Tile = (i32, i32, Vec<u8>);
+pub type Tile = (i32, i32, Vec<u8>);
 
 /// The tiles for `style`: corners and sides as `(width, height, premultiplied
 /// ARGB pixels)`, in the order the protocol's `attach_*` requests come in
@@ -77,8 +76,11 @@ type Tile = (i32, i32, Vec<u8>);
 /// down by `drop`: a side tile is one pixel across, which the compositor
 /// stretches along the side. Every tile also reaches [`INSET`] pixels in under
 /// the window, which is why a tile is that much bigger than its offset.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
+///
+/// Public for a client that makes its own Wayland objects and attaches the
+/// tiles to a surface of its own, as patina-shell does for a layer surface;
+/// an app with eframe's `Frame` uses [`request`].
+pub fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
     let sigma = style.blur.max(0.5);
     let reach = (sigma * 3.0).ceil() as i32;
     let shift = style.drop.round() as i32;

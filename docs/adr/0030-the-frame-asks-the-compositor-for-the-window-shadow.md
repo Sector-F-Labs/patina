@@ -36,6 +36,8 @@ does, through `raw-window-handle`. That is why the call can't happen inside `Tit
   a notch of what lies below. `request_styled` takes a `Style` (blur 8,
   drop 3, opacity 0.5 by default: measured on a white background, the sides, bottom and top of
   Firefox's focused shadow are 61, 79 and 44 of 255 dark, and these give about the same).
+- **`tiles(style)` is public,** for a client that has Wayland objects of its own and no eframe
+  `Frame`: patina-shell attaches them to the HUD's layer surfaces (patina-desktop's ADR-0113).
 - **It does nothing** off Linux, on X11, and where the compositor has no shadow protocol.
 - **The frame's wiring is six places now:** an app calls `request` from `App::ui`, when it draws its own
   frame.
