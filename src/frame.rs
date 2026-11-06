@@ -8,14 +8,18 @@
 //! Moving and resizing are handed to the compositor (`StartDrag`,
 //! `BeginResize`), so snapping and tiling behave as with a native frame.
 //!
-//! An app wires it up in five places:
+//! An app wires it up in six places:
 //!
 //! 1. [`viewport`] on the `ViewportBuilder`, to drop the system frame;
 //! 2. [`header_frame`] and [`TitleBar`] in the top panel;
 //! 3. [`edges`] after everything else is drawn;
 //! 4. [`clear_color`] from `App::clear_color`, so the rounded corners show the
 //!    desktop;
-//! 5. [`release_grab`] from `App::raw_input_hook`.
+//! 5. [`release_grab`] from `App::raw_input_hook`;
+//! 6. [`shadow::request`] from `App::ui`, with eframe's `Frame`, for the drop
+//!    shadow (the window draws its own frame, so nothing else gives it one).
+
+pub mod shadow;
 
 use egui::{Color32, CursorIcon, Id, Order, ResizeDirection, Sense, Stroke, ViewportCommand, vec2};
 

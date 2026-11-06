@@ -2546,11 +2546,15 @@ dependencies = [
  "image",
  "libc",
  "pulldown-cmark",
+ "raw-window-handle",
  "serde",
  "serde_ignored",
  "syntect",
  "toml",
  "two-face",
+ "wayland-backend",
+ "wayland-client",
+ "wayland-protocols-plasma",
  "zbus",
 ]
 

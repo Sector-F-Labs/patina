@@ -11,6 +11,18 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Added
+
+- `frame::shadow::request(&frame)` asks the compositor to draw a drop shadow around the window,
+  through KDE's `org_kde_kwin_shadow` protocol (the Patina compositor and KWin draw it; others
+  show nothing). `request_styled` takes a `shadow::Style` (ADR-0030).
+
+### Upgrading
+
+- **Apps that draw their own frame: call `patina::frame::shadow::request(frame)` from
+  `App::ui`,** with eframe's `Frame`, when the frame is the app's own (ADR-0030). Without it the
+  window has no shadow; nothing else changes.
+
 ### Fixed
 
 - A local image in the markdown editor shows its file again when another program changes it (checked
