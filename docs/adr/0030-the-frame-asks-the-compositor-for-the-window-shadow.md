@@ -31,7 +31,9 @@ does, through `raw-window-handle`. That is why the call can't happen inside `Tit
   display handles), asks once per window. It makes a second event queue on winit's own
   `wl_display` (not a second connection, which couldn't name winit's surface), binds the shadow
   manager and `wl_shm`, and hands over eight generated tiles: the blurred edge of a rectangle
-  the window's size, black, moved down a little. `request_styled` takes a `Style` (blur 8,
+  the window's size, black, moved down a little. The tiles also reach 16 px in under the window,
+  past its corner radius: the corners are transparent, and without shadow behind them each showed
+  a notch of what lies below. `request_styled` takes a `Style` (blur 8,
   drop 6, opacity 0.45 by default).
 - **It does nothing** off Linux, on X11, and where the compositor has no shadow protocol.
 - **The frame's wiring is six places now:** an app calls `request` from `App::ui`, when it draws its own

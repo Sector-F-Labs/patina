@@ -58,6 +58,12 @@ pub fn request_styled(window: &(impl HasWindowHandle + HasDisplayHandle), style:
     let _ = (window, style);
 }
 
+/// How far the tiles reach in under the window, past its edge. The window's
+/// corners are rounded (`frame::WINDOW_RADIUS`) and transparent, so without
+/// shadow behind them each corner shows a notch of what's below; this is more
+/// than the radius, and the window covers the rest.
+const INSET: i32 = 16;
+
 /// One tile: its width, its height and its pixels.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 type Tile = (i32, i32, Vec<u8>);
@@ -69,7 +75,8 @@ type Tile = (i32, i32, Vec<u8>);
 ///
 /// Each pixel is the blurred edge of a rectangle the window's size, moved
 /// down by `drop`: a side tile is one pixel across, which the compositor
-/// stretches along the side.
+/// stretches along the side. Every tile also reaches [`INSET`] pixels in under
+/// the window, which is why a tile is that much bigger than its offset.
 #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
     let sigma = style.blur.max(0.5);
@@ -86,13 +93,15 @@ fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
         // Black, so premultiplied it is just the alpha.
         [0, 0, 0, (a.clamp(0.0, 1.0) * 255.0).round() as u8]
     };
-    // Distance outside the window's left, right, top and bottom edge of the
-    // pixel at `i` in a tile `n` across that ends at the window's edge on
-    // that side (or begins at it, for the right and bottom).
+    // How far outside the window's left, right, top and bottom edge a pixel
+    // is, negative under the window. A left or top tile starts `left` or `top`
+    // outside the edge; a right or bottom one starts `INSET` inside it.
     let outside_left = |x: i32| (left - x) as f32 - 0.5;
-    let outside_right = |x: i32| x as f32 + 0.5;
+    let outside_right = |x: i32| (x - INSET) as f32 + 0.5;
     let outside_top = |y: i32| (top - y) as f32 - 0.5 + shift as f32;
-    let outside_bottom = |y: i32| y as f32 + 0.5 - shift as f32;
+    let outside_bottom = |y: i32| (y - INSET) as f32 + 0.5 - shift as f32;
+    let (wide_left, wide_right) = (left + INSET, right + INSET);
+    let (tall_top, tall_bottom) = (top + INSET, bottom + INSET);
     let build = |w: i32, h: i32, f: &dyn Fn(i32, i32) -> [u8; 4]| {
         let mut bytes = Vec::with_capacity((w * h * 4) as usize);
         for y in 0..h {
@@ -103,20 +112,20 @@ fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
         (w, h, bytes)
     };
     let tiles = [
-        build(left, 1, &|x, _| pixel(Some(outside_left(x)), None)),
-        build(left, top, &|x, y| {
+        build(wide_left, 1, &|x, _| pixel(Some(outside_left(x)), None)),
+        build(wide_left, tall_top, &|x, y| {
             pixel(Some(outside_left(x)), Some(outside_top(y)))
         }),
-        build(1, top, &|_, y| pixel(None, Some(outside_top(y)))),
-        build(right, top, &|x, y| {
+        build(1, tall_top, &|_, y| pixel(None, Some(outside_top(y)))),
+        build(wide_right, tall_top, &|x, y| {
             pixel(Some(outside_right(x)), Some(outside_top(y)))
         }),
-        build(right, 1, &|x, _| pixel(Some(outside_right(x)), None)),
-        build(right, bottom, &|x, y| {
+        build(wide_right, 1, &|x, _| pixel(Some(outside_right(x)), None)),
+        build(wide_right, tall_bottom, &|x, y| {
             pixel(Some(outside_right(x)), Some(outside_bottom(y)))
         }),
-        build(1, bottom, &|_, y| pixel(None, Some(outside_bottom(y)))),
-        build(left, bottom, &|x, y| {
+        build(1, tall_bottom, &|_, y| pixel(None, Some(outside_bottom(y)))),
+        build(wide_left, tall_bottom, &|x, y| {
             pixel(Some(outside_left(x)), Some(outside_bottom(y)))
         }),
     ];
@@ -343,10 +352,10 @@ mod tests {
     #[test]
     fn tiles_fit_their_offsets_and_fade_out() {
         let (tiles, [left, top, right, bottom]) = tiles(Style::default());
-        assert_eq!(tiles[0].0, left);
-        assert_eq!(tiles[2].1, top);
-        assert_eq!(tiles[4].0, right);
-        assert_eq!(tiles[6].1, bottom);
+        assert_eq!(tiles[0].0, left + INSET);
+        assert_eq!(tiles[2].1, top + INSET);
+        assert_eq!(tiles[4].0, right + INSET);
+        assert_eq!(tiles[6].1, bottom + INSET);
         for (w, h, bytes) in &tiles {
             assert_eq!(bytes.len(), (w * h * 4) as usize);
         }
@@ -355,6 +364,9 @@ mod tests {
         let alpha = |i: usize, x: usize| tiles[i].2[x * 4 + 3];
         assert!(alpha(0, left as usize - 1) > 40);
         assert!(alpha(0, 0) < 4);
+        // Under the window it is darker still, so a rounded corner has
+        // shadow behind it.
+        assert!(alpha(0, left as usize + INSET as usize - 1) > alpha(0, left as usize - 1));
         // The shadow sits lower: more of it under the window than over.
         assert!(bottom > top);
     }
