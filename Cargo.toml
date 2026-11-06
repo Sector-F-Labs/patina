@@ -38,7 +38,8 @@ raw-window-handle = "0.6"
 libc = "0.2"
 # The window shadow (src/shadow.rs): the protocol on the toolkit's own connection.
 wayland-client = "0.31"
-wayland-backend = { version = "0.3", features = ["client_system"] }
+# dlopen, as winit has it: libwayland-client is loaded when the app runs, not needed to build.
+wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
 wayland-protocols-plasma = { version = "0.3", default-features = false, features = ["client"] }
 
 [dev-dependencies]
