@@ -54,6 +54,8 @@ pub enum TabLabel {
     IconAndTitle,
 }
 
+/// The ring round a shown tab that has no fill to show it by.
+const OUTLINE: f32 = 3.0;
 /// The side of a tab's close button.
 const CLOSE: f32 = 18.0;
 /// The width of the `+` tab.
@@ -324,7 +326,8 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
         for (i, title) in self.titles.iter().enumerate() {
             let title = title.as_ref();
             let launcher = self.launcher(i);
-            let (fill, ink) = if i == self.shown && !launcher {
+            let current = i == self.shown && !launcher;
+            let (fill, ink) = if current {
                 (Some(shown), global.visuals.strong_text_color())
             } else {
                 (None, ink)
@@ -340,6 +343,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
                 ink,
                 closable: crossed,
                 faded: launcher,
+                outline: current && shown == self.bar,
             };
             let width = if launcher { ICON_TAB } else { width };
             let response = tab(ui, id, width, self.span, sense, look);
@@ -427,6 +431,7 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
                 ink,
                 closable: false,
                 faded: false,
+                outline: false,
             };
             if tab(
                 ui,
@@ -448,7 +453,8 @@ impl<'a, T: AsRef<str>> TabStrip<'a, T> {
 
 /// What a tab draws: its `mark` and `text`, centred together, in `ink`, on
 /// `fill` (else lit when hovered), clear of a close button if `closable`;
-/// `faded`, a launcher's.
+/// `faded`, a launcher's. `outline` rings the tab in `ink`, for a shown tab
+/// whose fill is no different from the bar's.
 struct Look<'t> {
     mark: Option<Mark>,
     text: &'t str,
@@ -456,6 +462,7 @@ struct Look<'t> {
     ink: Color32,
     closable: bool,
     faded: bool,
+    outline: bool,
 }
 
 /// Ctrl+T for a new tab, Ctrl+W to close the shown one, Ctrl+PageUp/PageDown
@@ -550,6 +557,7 @@ fn tab(
         ink,
         closable,
         faded,
+        outline,
     } = look;
     let (row, _) = ui.allocate_exact_size(
         egui::vec2(width, ui.spacing().interact_size.y),
@@ -570,6 +578,15 @@ fn tab(
             .then(|| ui.visuals().widgets.hovered.weak_bg_fill)
     }) {
         painter.rect_filled(rect, 0.0, fill);
+    }
+    if outline {
+        // Inside the tab, where the clip keeps it whole.
+        painter.rect_stroke(
+            rect.shrink(OUTLINE / 2.0),
+            0.0,
+            egui::Stroke::new(OUTLINE, ink),
+            egui::StrokeKind::Inside,
+        );
     }
     let room = if closable && width > 4.0 * CLOSE {
         width - 2.0 * CLOSE - 8.0

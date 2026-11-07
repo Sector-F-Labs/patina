@@ -32,6 +32,7 @@ pub const BUILT_IN: &[(&str, &str)] = &[
         include_str!("../skins/dark-orange.toml"),
     ),
     ("calendar.toml", include_str!("../skins/calendar.toml")),
+    ("e-ink.toml", include_str!("../skins/e-ink.toml")),
     (
         "everforest-dark.toml",
         include_str!("../skins/everforest-dark.toml"),
@@ -116,6 +117,9 @@ pub struct Controls {
     pub text: Option<Hex>,
     pub text_hover: Option<Hex>,
     pub border: Option<Hex>,
+    /// Slider rail. egui draws it as a plain fill with no outline, so on a
+    /// skin where `surface` is the page colour it needs its own colour.
+    pub track: Option<Hex>,
 }
 
 /// The app's own window frame: its title bar, edge and corners.
@@ -331,6 +335,9 @@ impl Skin {
                 }
             }
         }
+        if let Some(track) = get(k.track) {
+            v.widgets.inactive.bg_fill = track;
+        }
         if let Some(link) = get(c.link) {
             v.hyperlink_color = link;
         }
@@ -538,6 +545,7 @@ mod tests {
             [
                 "Dark Orange",
                 "Calendar",
+                "E-Ink",
                 "Everforest Dark",
                 "Notebook",
                 "Steam Classic"
@@ -585,6 +593,7 @@ mod tests {
                 "Default",
                 "Calendar",
                 "Dark Orange",
+                "E-Ink",
                 "Everforest Dark",
                 "Notebook",
                 "Steam Classic"
