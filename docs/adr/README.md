@@ -72,6 +72,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0028](0028-the-bar-s-buttons-are-photograph-s.md) | The title bar's buttons are sized as Photograph's Render and Edit | Accepted |
 | [0029](0029-the-folder-tree-can-list-files.md) | The folder tree can list files | Accepted |
 | [0030](0030-the-frame-asks-the-compositor-for-the-window-shadow.md) | The frame asks the compositor for the window's shadow: `frame::shadow::request` | Accepted |
+| [0031](0031-colour-emoji-from-teleprinter.md) | Colour emoji are Patina's: the Teleprinter code, bundled and shared | Accepted |
 
 ## Decision Relationship
 

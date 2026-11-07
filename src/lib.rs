@@ -14,10 +14,14 @@
 //! - [`menu`]: menus, their items 24 high, and context menus in that style.
 //! - [`kinetic`]: a touchpad flick keeps scrolling after the fingers lift.
 //! - [`open`]: opens files and folders in the desktop's apps, not the browser.
+//! - [`emoji`] (feature `emoji`): colour emoji, which egui can't draw, as
+//!   images from a bundled Noto Color Emoji.
 //! - [`markdown`] (feature `markdown`): markdown shown and edited as Notebook
 //!   does, read-only for documentation; source files highlighted.
 
 pub mod appearance;
+#[cfg(feature = "emoji")]
+pub mod emoji;
 pub mod frame;
 #[cfg(feature = "highlight")]
 pub mod highlight;

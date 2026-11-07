@@ -1354,8 +1354,11 @@ impl Editor {
                         embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
                     }
                     Para::Image(image) => {
-                        let (dir, id, editable) =
-                            (self.dir.as_deref(), self.id.with(("image", i)), !self.read_only);
+                        let (dir, id, editable) = (
+                            self.dir.as_deref(),
+                            self.id.with(("image", i)),
+                            !self.read_only,
+                        );
                         if self.image_room > 0.0 {
                             let free = ui.available_rect_before_wrap();
                             let wide = Rect::from_min_max(
@@ -1365,9 +1368,8 @@ impl Editor {
                             // A child that isn't allocated in this ui, so the page's
                             // width doesn't grow to hold it: only its height is.
                             let layout = egui::Layout::top_down(egui::Align::Center);
-                            let mut child = ui.new_child(
-                                egui::UiBuilder::new().max_rect(wide).layout(layout),
-                            );
+                            let mut child =
+                                ui.new_child(egui::UiBuilder::new().max_rect(wide).layout(layout));
                             let out = embeds::image(&mut child, image, dir, id, editable);
                             let height = child.min_rect().height();
                             ui.allocate_space(vec2(free.width(), height));

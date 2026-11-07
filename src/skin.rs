@@ -759,7 +759,10 @@ mod steady_tests {
         let size = std::cell::Cell::new((egui::Vec2::ZERO, egui::Pos2::ZERO));
         let run = |pointer: Option<egui::Pos2>| {
             let mut input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0))),
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(400.0, 300.0),
+                )),
                 ..Default::default()
             };
             input.events.push(match pointer {
@@ -767,13 +770,19 @@ mod steady_tests {
                 None => egui::Event::PointerGone,
             });
             let out = ctx.run_ui(input, |ui| {
-                ui.visuals_mut().widgets.inactive.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
-                ui.visuals_mut().widgets.hovered.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
-                ui.visuals_mut().widgets.active.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.inactive.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.hovered.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.active.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
                 if steady {
                     steady_controls(ui);
                 }
-                size.set((ui.selectable_label(false, "Folder").rect.size(), egui::Pos2::ZERO));
+                size.set((
+                    ui.selectable_label(false, "Folder").rect.size(),
+                    egui::Pos2::ZERO,
+                ));
             });
             // Where the text was drawn.
             let text = out
@@ -799,7 +808,10 @@ mod steady_tests {
     #[test]
     fn hovering_a_stroked_control_does_not_resize_it() {
         let (idle, hovered) = sizes(1.0, false);
-        assert_ne!(idle, hovered, "egui alone resizes; the test would prove nothing");
+        assert_ne!(
+            idle, hovered,
+            "egui alone resizes; the test would prove nothing"
+        );
         for width in [1.0, 2.0] {
             let (idle, hovered) = sizes(width, true);
             assert_eq!(idle, hovered, "border {width}");

@@ -2551,6 +2551,7 @@ dependencies = [
  "serde_ignored",
  "syntect",
  "toml",
+ "ttf-parser",
  "two-face",
  "wayland-backend",
  "wayland-client",

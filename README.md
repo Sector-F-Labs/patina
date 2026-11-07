@@ -50,6 +50,10 @@ Patina re-exports `egui`, and an app has to use the same egui version.
   worker threads, so slow network shares never block the UI.
 - **`ime`**: `drop_repeated_preedits`, for `App::raw_input_hook`. Without it, a focused text field
   on GNOME's Wayland keeps the window repainting at full speed.
+- **`emoji`** (cargo feature `emoji`): colour emoji, which egui can't draw, as images from a bundled
+  Noto Color Emoji: `emoji::label(ui, text)` for text with emoji in it, `emoji::runs` and
+  `emoji::paint` for a widget that lays its own text out. See
+  [ADR-0031](docs/adr/0031-colour-emoji-from-teleprinter.md).
 - **`markdown`** (cargo feature `markdown`): markdown shown as Notebook shows it, with no syntax
   on screen: an `Editor` that edits in place or, read-only, only shows, selects and hands clicked
   links to the app; tables, highlighted code and images; and `embeds::code_file` for a whole

@@ -18,6 +18,9 @@ default = []
 markdown = ["highlight", "dep:pulldown-cmark", "dep:egui_extras", "dep:image"]
 # Syntax highlighting, a line at a time (patina::highlight).
 highlight = ["dep:syntect", "dep:two-face"]
+# Colour emoji (patina::emoji): Noto Color Emoji bundled and painted as images,
+# since egui draws no colour glyphs (about 11 MB of binary).
+emoji = ["dep:ttf-parser", "dep:image"]
 
 [dependencies]
 egui = "0.35"
@@ -27,6 +30,7 @@ syntect = { version = "5.3", default-features = false, features = ["default-fanc
 # bat's syntaxes, precompiled: syntect's and TOML, TypeScript, Dockerfile...
 two-face = { version = "0.4", default-features = false, features = ["syntect-fancy"], optional = true }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp"], optional = true }
+ttf-parser = { version = "0.25.1", optional = true }
 dirs = "7"
 serde = { version = "1", features = ["derive"] }
 serde_ignored = "0.1"

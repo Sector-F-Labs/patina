@@ -11,6 +11,20 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Added
+
+- `patina::emoji` (cargo feature `emoji`): colour emoji from a bundled Noto Color Emoji (SIL OFL),
+  painted as images because egui draws no colour glyphs. `emoji::label(ui, text)` shows text with
+  its emoji in colour; `emoji::runs` splits text into plain and emoji runs, and `glyph`, `texture` and
+  `paint` are the pieces, for a widget that lays text out itself. It is Teleprinter's code (its
+  ADR-0013), shared. The feature adds about 11 MB to the binary (ADR-0031).
+
+### Upgrading
+
+- **Apps that show text with emoji in it: enable the `emoji` feature and show that text with
+  `patina::emoji::label`.** egui's own labels still draw emoji as monochrome shapes. Nothing else
+  changes.
+
 ## 0.1.15 — 2026-11-06
 
 ### Added

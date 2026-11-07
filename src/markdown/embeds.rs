@@ -500,13 +500,18 @@ const IMAGE_POLL: f64 = 0.5;
 /// every `IMAGE_POLL` seconds, and asks for a frame then so a change is seen
 /// without any input.
 fn refresh_if_changed(ctx: &egui::Context, uri: &str) {
-    let Some(path) = uri.strip_prefix("file://") else { return };
+    let Some(path) = uri.strip_prefix("file://") else {
+        return;
+    };
     let now = ctx.input(|i| i.time);
     let key = Id::new(("image-seen", uri));
-    let (checked, seen): (f64, Option<std::time::SystemTime>) =
-        ctx.data(|d| d.get_temp(key)).unwrap_or((f64::NEG_INFINITY, None));
+    let (checked, seen): (f64, Option<std::time::SystemTime>) = ctx
+        .data(|d| d.get_temp(key))
+        .unwrap_or((f64::NEG_INFINITY, None));
     if now - checked < IMAGE_POLL {
-        ctx.request_repaint_after(std::time::Duration::from_secs_f64(IMAGE_POLL - (now - checked)));
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(
+            IMAGE_POLL - (now - checked),
+        ));
         return;
     }
     let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok();

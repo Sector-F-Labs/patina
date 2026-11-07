@@ -122,8 +122,10 @@ impl FolderTree {
         // Keys that move through the matches, taken before the box sees them.
         if ui.memory(|m| m.has_focus(id)) && !self.filter.trim().is_empty() {
             let step = ui.input_mut(|i| {
-                let down = i.consume_key(Modifiers::CTRL, Key::N) || i.consume_key(Modifiers::NONE, Key::ArrowDown);
-                let up = i.consume_key(Modifiers::CTRL, Key::P) || i.consume_key(Modifiers::NONE, Key::ArrowUp);
+                let down = i.consume_key(Modifiers::CTRL, Key::N)
+                    || i.consume_key(Modifiers::NONE, Key::ArrowDown);
+                let up = i.consume_key(Modifiers::CTRL, Key::P)
+                    || i.consume_key(Modifiers::NONE, Key::ArrowUp);
                 i64::from(down) - i64::from(up)
             });
             if step != 0 {
@@ -249,13 +251,21 @@ impl FolderTree {
             clicked = found.get(self.cursor).map(|item| item.path.clone());
         }
         for (n, item) in found.iter().take(SHOWN_AT_MOST).enumerate() {
-            let dir = item.path.parent().and_then(|d| d.strip_prefix(&self.root).ok());
-            let icon = if item.folder { "\u{1F4C1}" } else { "\u{1F4C4}" };
+            let dir = item
+                .path
+                .parent()
+                .and_then(|d| d.strip_prefix(&self.root).ok());
+            let icon = if item.folder {
+                "\u{1F4C1}"
+            } else {
+                "\u{1F4C4}"
+            };
             // The name, and under it the folder it's in, dimmed.
             let resp = ui
                 .vertical(|ui| {
                     ui.spacing_mut().item_spacing.y = 0.0;
-                    let resp = ui.selectable_label(n == self.cursor, format!("{icon} {}", item.name));
+                    let resp =
+                        ui.selectable_label(n == self.cursor, format!("{icon} {}", item.name));
                     if let Some(dir) = dir.filter(|d| !d.as_os_str().is_empty()) {
                         let dir = format!("      {}", dir.display());
                         ui.label(egui::RichText::new(dir).weak().small());
@@ -273,7 +283,10 @@ impl FolderTree {
             }
         }
         if found.len() > SHOWN_AT_MOST {
-            let more = format!("{} more: type more to narrow it", found.len() - SHOWN_AT_MOST);
+            let more = format!(
+                "{} more: type more to narrow it",
+                found.len() - SHOWN_AT_MOST
+            );
             ui.label(egui::RichText::new(more).weak().small());
         }
         if pending {
@@ -323,7 +336,14 @@ impl FolderTree {
                 Some(Children::Loading | Children::Failed(_)) => {}
             }
         }
-        found.sort_by_key(|(rank, item)| (*rank, item.name.len(), item.name.to_lowercase(), item.path.clone()));
+        found.sort_by_key(|(rank, item)| {
+            (
+                *rank,
+                item.name.len(),
+                item.name.to_lowercase(),
+                item.path.clone(),
+            )
+        });
         (found.into_iter().map(|(_, item)| item).collect(), pending)
     }
 
@@ -434,7 +454,10 @@ type Rank = u8;
 /// the query's letters in order with others between (three or more).
 fn fuzzy(name: &str, query: &str) -> Option<Rank> {
     let letters = |s: &str| -> Vec<char> {
-        s.chars().filter(|c| c.is_alphanumeric()).flat_map(char::to_lowercase).collect()
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect()
     };
     let (want, have) = (letters(query), letters(name));
     if want.is_empty() {
@@ -444,7 +467,11 @@ fn fuzzy(name: &str, query: &str) -> Option<Rank> {
         return Some(0);
     }
     let lower = name.to_lowercase();
-    if query.split(|c: char| !c.is_alphanumeric()).filter(|w| !w.is_empty()).all(|w| lower.contains(&w.to_lowercase())) {
+    if query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .all(|w| lower.contains(&w.to_lowercase()))
+    {
         return Some(1);
     }
     let mut at = have.iter();
@@ -495,9 +522,14 @@ mod tests {
     /// Whether egui flagged a widget id clash (a red box and a fire) in any
     /// frame while the tree loaded and opened `target`.
     fn clash_while_opening(files: bool) -> Vec<String> {
-        let dir = std::env::temp_dir().join(format!("patina-clash-test-{}-{files}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("patina-clash-test-{}-{files}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        for d in ["a/b/c", "a/b/d", "a/e", "f/g"].into_iter().map(String::from).chain((0..60).map(|n| format!("a/b/c/n{n}/m"))) {
+        for d in ["a/b/c", "a/b/d", "a/e", "f/g"]
+            .into_iter()
+            .map(String::from)
+            .chain((0..60).map(|n| format!("a/b/c/n{n}/m")))
+        {
             std::fs::create_dir_all(dir.join(d)).unwrap();
         }
         std::fs::write(dir.join("a/b/c/x.txt"), b"").unwrap();
@@ -508,15 +540,20 @@ mod tests {
         let mut clashes = Vec::new();
         for frame in 0..40 {
             let input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 600.0))),
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(400.0, 600.0),
+                )),
                 time: Some(frame as f64 * 0.05),
                 ..Default::default()
             };
             let out = ctx.run_ui(input, |ui| {
                 tree.poll();
-                egui::ScrollArea::vertical().auto_shrink([false, false]).show(ui, |ui| {
-                    tree.show(ui, &dir);
-                });
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        tree.show(ui, &dir);
+                    });
             });
             for s in &out.shapes {
                 if let egui::epaint::Shape::Text(t) = &s.shape
@@ -534,7 +571,11 @@ mod tests {
     #[test]
     fn opening_folders_clashes_no_ids() {
         for files in [false, true] {
-            assert_eq!(clash_while_opening(files), Vec::<String>::new(), "files={files}");
+            assert_eq!(
+                clash_while_opening(files),
+                Vec::<String>::new(),
+                "files={files}"
+            );
         }
     }
 
@@ -612,7 +653,12 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("src/deep")).unwrap();
         std::fs::create_dir_all(dir.join("docs")).unwrap();
-        for f in ["src/deep/Needle.rs", "src/other.rs", "docs/a.md", "docs/needle.md"] {
+        for f in [
+            "src/deep/Needle.rs",
+            "src/other.rs",
+            "docs/a.md",
+            "docs/needle.md",
+        ] {
             std::fs::write(dir.join(f), b"").unwrap();
         }
         let mut tree = FolderTree::new(dir.clone(), "p".into()).files(true);
@@ -631,7 +677,13 @@ mod tests {
         let names: Vec<String> = found
             .0
             .iter()
-            .map(|i| i.path.strip_prefix(&dir).unwrap().to_string_lossy().into_owned())
+            .map(|i| {
+                i.path
+                    .strip_prefix(&dir)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect();
         // Only the matches, by name, whatever folder they're in.
         assert_eq!(names, ["docs/needle.md", "src/deep/Needle.rs"]);
@@ -653,8 +705,15 @@ mod tests {
     }
 
     /// One frame of the tree's filter box and list, with `events` pressed.
-    fn frame(ctx: &egui::Context, tree: &mut FolderTree, events: Vec<egui::Event>) -> Option<PathBuf> {
-        let input = egui::RawInput { events, ..Default::default() };
+    fn frame(
+        ctx: &egui::Context,
+        tree: &mut FolderTree,
+        events: Vec<egui::Event>,
+    ) -> Option<PathBuf> {
+        let input = egui::RawInput {
+            events,
+            ..Default::default()
+        };
         let mut opened = None;
         let _ = ctx.run_ui(input, |ui| {
             tree.poll();
@@ -665,7 +724,13 @@ mod tests {
     }
 
     fn press(key: egui::Key, modifiers: egui::Modifiers) -> egui::Event {
-        egui::Event::Key { key, physical_key: Some(key), pressed: true, repeat: false, modifiers }
+        egui::Event::Key {
+            key,
+            physical_key: Some(key),
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }
     }
 
     #[test]
@@ -690,9 +755,21 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         frame(&ctx, &mut tree, vec![]);
-        frame(&ctx, &mut tree, vec![press(egui::Key::N, egui::Modifiers::CTRL)]);
-        frame(&ctx, &mut tree, vec![press(egui::Key::N, egui::Modifiers::CTRL)]);
-        frame(&ctx, &mut tree, vec![press(egui::Key::P, egui::Modifiers::CTRL)]);
+        frame(
+            &ctx,
+            &mut tree,
+            vec![press(egui::Key::N, egui::Modifiers::CTRL)],
+        );
+        frame(
+            &ctx,
+            &mut tree,
+            vec![press(egui::Key::N, egui::Modifiers::CTRL)],
+        );
+        frame(
+            &ctx,
+            &mut tree,
+            vec![press(egui::Key::P, egui::Modifiers::CTRL)],
+        );
         assert_eq!(tree.cursor, 1);
         frame(&ctx, &mut tree, vec![press(egui::Key::ArrowDown, none)]);
         frame(&ctx, &mut tree, vec![press(egui::Key::ArrowDown, none)]);
