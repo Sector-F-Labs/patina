@@ -17,26 +17,35 @@ is added there in the same commit (ADR-0025).
   painted as images because egui draws no colour glyphs. `emoji::label(ui, text)` shows text with
   its emoji in colour; `emoji::runs` splits text into plain and emoji runs, and `glyph`, `texture` and
   `paint` are the pieces, for a widget that lays text out itself. It is Teleprinter's code (its
-  ADR-0013), shared. The font is not in `patina-ui`: it is the `patina-emoji-font` crate in this
-  repository, git only, because at 10 MB it takes the package over crates.io's size limit (see
-  Upgrading). The feature adds about 11 MB to the binary (ADR-0031).
+  ADR-0013), shared. The font is not in `patina-ui`, because at 10 MB it takes the package over
+  crates.io's size limit: apps install the system's (`emoji::install_system`), a file
+  (`install_file`), or the `patina-emoji-font` git crate in this repository (see Upgrading). The feature adds about 11 MB to the binary (ADR-0031).
 - The markdown `Editor` draws emoji in colour when both `markdown` and `emoji` are enabled: they
   are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
   painted over them.
 
 ### Upgrading
 
-- **Apps that show text with emoji in it: enable the `emoji` feature, add the font, install it and
-  show that text with `patina::emoji::label`.** In `Cargo.toml`:
+- **Apps that show text with emoji in it: enable the `emoji` feature, install a font and show that
+  text with `patina::emoji::label`.** The font isn't in `patina-ui` (10 MB is over crates.io's size
+  limit), so once at start-up call one of:
+
+  ```rust
+  patina::emoji::install_system();            // the system's Noto Color Emoji: nothing else needed
+  patina::emoji::install_file(&path);         // a font file you ship or the user picks
+  patina::emoji::install(patina_emoji_font::FONT); // our bundled copy (below)
+  ```
+
+  Each says `false` if it found no usable font (it must be Noto Color Emoji's CBDT build); emoji
+  then stay as egui draws them. `install_system` and `install_file` work in an app published to
+  crates.io. For a guaranteed font, depend on the bundled one from git (crates.io refuses git
+  dependencies, so not in a published app):
 
   ```toml
-  patina-ui = { git = "https://github.com/Sector-F-Labs/patina", branch = "develop", features = ["emoji"] }
   patina-emoji-font = { git = "https://github.com/Sector-F-Labs/patina", branch = "develop" }
   ```
 
-  and once at start-up, `patina::emoji::install(patina_emoji_font::FONT);`. Without that call emoji
-  stay as egui draws them. An app published to crates.io can't use the font, as crates.io refuses
-  git dependencies. egui's own labels still draw emoji as monochrome shapes. Nothing else changes.
+  egui's own labels still draw emoji as monochrome shapes. Nothing else changes.
 
 ## 0.1.15 — 2026-11-06
 
