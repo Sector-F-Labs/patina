@@ -53,9 +53,9 @@ Patina re-exports `egui`, and an app has to use the same egui version.
 - **`emoji`** (cargo feature `emoji`): colour emoji, which egui can't draw, as images from Noto Color
   Emoji: `emoji::label(ui, text)` for text with emoji in it, `emoji::runs` and `emoji::paint` for a
   widget that lays its own text out. The 10 MB font is not in this crate (crates.io's size limit):
-  call `patina::emoji::install_system()` once at start-up to use the system's Noto Color Emoji,
-  `install_file(path)` for a font of your own, or `install(patina_emoji_font::FONT)` with the
-  `patina-emoji-font` git crate for a bundled copy. See
+  give it a Noto Color Emoji (CBDT build) once at start-up, with `emoji::install(bytes)` or
+  `emoji::install_file(path)`: yours, bundled or chosen by the user. Patina doesn't look for one.
+  (Sector F's apps use the `patina-emoji-font` git crate.) See
   [ADR-0031](docs/adr/0031-colour-emoji-from-teleprinter.md).
 - **`markdown`** (cargo feature `markdown`): markdown shown as Notebook shows it, with no syntax
   on screen: an `Editor` that edits in place or, read-only, only shows, selects and hands clicked

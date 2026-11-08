@@ -2,7 +2,7 @@
 //! outline in one colour and never reads a colour font, so emoji in egui text
 //! come out as monochrome shapes, or as boxes. This module paints emoji as
 //! images from Noto Color Emoji (its CBDT build, SIL OFL), which the app
-//! installs (`install_system`, `install_file`, or the git-only `patina-emoji-font`). The
+//! installs (`install`, `install_file`): Patina doesn't look for one. The
 //! font's cmap and GSUB ligatures turn a sequence (a ZWJ family, a skin
 //! tone, a flag, a keycap) into its glyph, and the glyph's 136 px PNG
 //! becomes a texture, made once per glyph.
@@ -28,8 +28,9 @@ static FONT: OnceLock<&'static [u8]> = OnceLock::new();
 /// Gives this module a colour emoji font: the bytes of a Noto Color Emoji
 /// (its CBDT build, with PNG images). Call it once at start-up (ADR-0031).
 /// The font isn't part of this crate, for it is 10 MB, over crates.io's
-/// limit: the app brings its own, from [`install_system`], [`install_file`]
-/// or the `patina-emoji-font` git crate (`install(patina_emoji_font::FONT)`).
+/// limit, and where one lives differs by platform: the app brings its own
+/// (bundled, found, or chosen by the user), through this or [`install_file`].
+/// Sector F's desktop uses the `patina-emoji-font` git crate.
 /// Until a font is installed, emoji stay in the plain text, as monochrome
 /// shapes or boxes. The first font installed is the one used; a font that
 /// has no emoji images is refused, and `false` says so.
@@ -54,35 +55,6 @@ pub fn install_file(path: &std::path::Path) -> bool {
         Ok(bytes) if usable(&bytes) => install(Box::leak(bytes.into_boxed_slice())),
         _ => false,
     }
-}
-
-/// Installs the system's Noto Color Emoji: the file fontconfig names for it
-/// (`fc-match`), else the usual places (`/usr/share/fonts`, `~/.local/share/fonts`).
-/// `false` if there is none, or only a font of another kind (Apple's, or Noto's
-/// newer COLR build). Linux distributions ship the CBDT one as `fonts-noto-color-emoji`,
-/// `google-noto-emoji-color-fonts` and so on.
-pub fn install_system() -> bool {
-    let named = std::process::Command::new("fc-match")
-        .args(["-f", "%{file}", "Noto Color Emoji"])
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .and_then(|o| String::from_utf8(o.stdout).ok());
-    let home = dirs::home_dir().unwrap_or_default();
-    let mut places: Vec<std::path::PathBuf> = named.into_iter().map(Into::into).collect();
-    for dir in [
-        "/usr/share/fonts/truetype/noto",
-        "/usr/share/fonts/noto",
-        "/usr/share/fonts/google-noto-color-emoji-fonts",
-        "/usr/share/fonts/google-noto-emoji",
-        "/usr/share/fonts/noto-color-emoji",
-        "/usr/local/share/fonts",
-    ] {
-        places.push(std::path::Path::new(dir).join("NotoColorEmoji.ttf"));
-    }
-    places.push(home.join(".local/share/fonts/NotoColorEmoji.ttf"));
-    places.push(home.join(".fonts/NotoColorEmoji.ttf"));
-    places.into_iter().any(|p| install_file(&p))
 }
 
 /// Whether `font` is one this module can draw from: it parses, and has a
@@ -334,14 +306,6 @@ pub fn label(ui: &mut Ui, text: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn the_distributions_font_is_one_we_can_draw_from() {
-        // Where the machine has Noto Color Emoji at Debian's and Ubuntu's place.
-        if let Ok(bytes) = std::fs::read("/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf") {
-            assert!(usable(&bytes));
-        }
-    }
 
     #[test]
     fn a_font_without_emoji_is_refused() {
