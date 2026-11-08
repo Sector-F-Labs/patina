@@ -2536,6 +2536,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "patina-emoji-font"
+version = "0.1.0"
+
+[[package]]
 name = "patina-ui"
 version = "0.1.15"
 dependencies = [
@@ -2545,6 +2549,7 @@ dependencies = [
  "egui_extras",
  "image",
  "libc",
+ "patina-emoji-font",
  "pulldown-cmark",
  "raw-window-handle",
  "serde",

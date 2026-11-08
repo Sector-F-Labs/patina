@@ -1,7 +1,8 @@
 //! Colour emoji (feature `emoji`, ADR-0031). egui draws every glyph from its
 //! outline in one colour and never reads a colour font, so emoji in egui text
-//! come out as monochrome shapes, or as boxes. This module bundles Noto
-//! Color Emoji (its CBDT build, SIL OFL) and paints emoji as images: the
+//! come out as monochrome shapes, or as boxes. This module paints emoji as
+//! images from Noto Color Emoji (its CBDT build, SIL OFL), which the app
+//! installs: the font is the `patina-emoji-font` crate, git only. The
 //! font's cmap and GSUB ligatures turn a sequence (a ZWJ family, a skin
 //! tone, a flag, a keycap) into its glyph, and the glyph's 136 px PNG
 //! becomes a texture, made once per glyph.
@@ -21,7 +22,17 @@ use egui::{Color32, ColorImage, Rect, TextureHandle, TextureOptions, Ui, pos2, v
 use ttf_parser::gsub::SubstitutionSubtable;
 use ttf_parser::{Face, GlyphId, RasterImageFormat};
 
-static FONT: &[u8] = include_bytes!("../assets/fonts/NotoColorEmoji.ttf");
+/// The font, handed over by the app with [`install`].
+static FONT: OnceLock<&'static [u8]> = OnceLock::new();
+
+/// Gives this module the Noto Color Emoji font: call it once at start-up
+/// with `patina_emoji_font::FONT` (ADR-0031). The font isn't part of this
+/// crate, for it is 10 MB, over crates.io's limit. Until it is installed,
+/// emoji stay in the plain text, as monochrome shapes or boxes. A second
+/// call does nothing.
+pub fn install(font: &'static [u8]) {
+    let _ = FONT.set(font);
+}
 
 const ZWJ: char = '\u{200d}';
 const VS16: char = '\u{fe0f}';
@@ -29,7 +40,11 @@ const KEYCAP: char = '\u{20e3}';
 
 fn face() -> Option<&'static Face<'static>> {
     static FACE: OnceLock<Option<Face<'static>>> = OnceLock::new();
-    FACE.get_or_init(|| Face::parse(FONT, 0).ok()).as_ref()
+    #[cfg(test)]
+    install(patina_emoji_font::FONT);
+    // Not cached until the font is in, so an install after a first look still works.
+    let font = FONT.get()?;
+    FACE.get_or_init(|| Face::parse(font, 0).ok()).as_ref()
 }
 
 /// An emoji's glyph in the bundled font.
