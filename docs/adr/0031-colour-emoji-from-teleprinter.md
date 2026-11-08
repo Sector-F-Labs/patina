@@ -29,7 +29,8 @@ picker copied that code, and every other app would have had to.
 
 - An app gets colour emoji by enabling the feature and using `emoji::label` where its text may
   have emoji. egui's own labels, text edits and widgets still draw monochrome ones; that needs egui
-  to draw colour glyphs, or a widget of our own for each.
+  to draw colour glyphs, or a widget of our own for each. The markdown `Editor` is one such: with
+  both features on, it lays emoji out in transparent text and paints the image over them.
 - The packaged crate is about 10 MB compressed, at crates.io's limit. Publishing with this feature
   needs checking first; Sector F apps build on `develop`, so it doesn't stop them.
 - `label` lays plain text and emoji out as separate widgets in a wrapped row, so it wraps between

@@ -18,6 +18,9 @@ is added there in the same commit (ADR-0025).
   its emoji in colour; `emoji::runs` splits text into plain and emoji runs, and `glyph`, `texture` and
   `paint` are the pieces, for a widget that lays text out itself. It is Teleprinter's code (its
   ADR-0013), shared. The feature adds about 11 MB to the binary (ADR-0031).
+- The markdown `Editor` draws emoji in colour when both `markdown` and `emoji` are enabled: they
+  are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
+  painted over them.
 
 ### Upgrading
 
