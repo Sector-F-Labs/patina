@@ -294,6 +294,135 @@ fn html_image(tag: &str) -> Option<Image> {
     })
 }
 
+/// A piece of a table cell as it is shown: text, or an image in it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CellPart {
+    Text(String),
+    Image(Image),
+}
+
+/// A table cell's markdown source as the pieces it shows: its images
+/// (`![alt](src "title")`, `<img src="..">`, either inside a link) and the
+/// text between them, where `<br>` is a line break. Nothing is left out: a cell
+/// with no image is one `Text`.
+pub fn cell_parts(cell: &str) -> Vec<CellPart> {
+    fn text(parts: &mut Vec<CellPart>, pending: &mut String) {
+        let t = std::mem::take(pending);
+        let t = t
+            .replace("<br>", "\n")
+            .replace("<br/>", "\n")
+            .replace("<br />", "\n");
+        let t = t.trim_matches(|c: char| c == ' ' || c == '\n');
+        if !t.is_empty() {
+            parts.push(CellPart::Text(t.to_string()));
+        }
+    }
+    let mut parts = Vec::new();
+    let mut pending = String::new();
+    let mut i = 0;
+    while i < cell.len() {
+        let rest = &cell[i..];
+        let found = if rest.starts_with("![") {
+            markdown_image_at(rest)
+        } else if rest.starts_with("<img") {
+            rest.find('>').and_then(|end| {
+                html_image(&rest[..=end]).map(|image| (image, end + 1))
+            })
+        } else {
+            None
+        };
+        match found {
+            Some((image, mut len)) => {
+                // A badge: the image inside a link, `[![alt](src)](href)`.
+                if pending.ends_with('[')
+                    && let Some(after) = cell[i + len..].strip_prefix("](")
+                    && let Some(close) = after.find(')')
+                {
+                    pending.pop();
+                    len += 2 + close + 1;
+                }
+                text(&mut parts, &mut pending);
+                parts.push(CellPart::Image(image));
+                i += len;
+            }
+            None => {
+                let c = rest.chars().next().unwrap_or(' ');
+                pending.push(c);
+                i += c.len_utf8();
+            }
+        }
+    }
+    text(&mut parts, &mut pending);
+    parts
+}
+
+/// The image `![alt](dest "title")` that `s` starts with, and its length.
+fn markdown_image_at(s: &str) -> Option<(Image, usize)> {
+    let bytes = s.as_bytes();
+    // The alt text runs to the `]` that closes the `[`, past any `\]` and nested pairs.
+    let (mut depth, mut i) = (1, 2);
+    while depth > 0 {
+        match *bytes.get(i)? {
+            b'\\' => i += 1,
+            b'[' => depth += 1,
+            b']' => depth -= 1,
+            _ => {}
+        }
+        i += 1;
+    }
+    let alt = s[2..i - 1].replace("\\[", "[").replace("\\]", "]");
+    let mut rest = s[i..].strip_prefix('(')?.trim_start();
+    let consumed_to = |rest: &str| s.len() - rest.len();
+    let src = if let Some(inner) = rest.strip_prefix('<') {
+        let end = inner.find('>')?;
+        rest = &inner[end + 1..];
+        inner[..end].to_string()
+    } else {
+        // Up to white space or the `)`, with balanced parentheses inside.
+        let (mut depth, mut end) = (0, rest.len());
+        for (at, c) in rest.char_indices() {
+            match c {
+                '(' => depth += 1,
+                ')' if depth == 0 => {
+                    end = at;
+                    break;
+                }
+                ')' => depth -= 1,
+                c if c.is_whitespace() => {
+                    end = at;
+                    break;
+                }
+                _ => {}
+            }
+        }
+        let src = rest[..end].to_string();
+        rest = &rest[end..];
+        src
+    };
+    let rest = rest.trim_start();
+    let (title, rest) = match rest.chars().next() {
+        Some(q @ ('"' | '\'')) => {
+            let body = &rest[1..];
+            let close = body.find(q)?;
+            (body[..close].to_string(), &body[close + 1..])
+        }
+        _ => (String::new(), rest),
+    };
+    let rest = rest.trim_start().strip_prefix(')')?;
+    if src.is_empty() {
+        return None;
+    }
+    Some((
+        Image {
+            alt,
+            src,
+            title,
+            html: None,
+        },
+        consumed_to(rest),
+    ))
+}
+
 fn image_markdown(image: &Image) -> String {
     if let Some(html) = &image.html {
         return html.clone();
@@ -971,6 +1100,48 @@ mod tests {
     fn unsupported_blocks_are_kept_verbatim() {
         let src = "---\ntitle: x\n---\n\n<div>hi</div>\n\n![img](a.png) text\n";
         assert_eq!(roundtrip(src), src);
+    }
+
+    #[test]
+    fn a_cell_is_its_text_and_its_images() {
+        let image = |alt: &str, src: &str| {
+            CellPart::Image(Image {
+                alt: alt.into(),
+                src: src.into(),
+                title: String::new(),
+                html: None,
+            })
+        };
+        let text = |t: &str| CellPart::Text(t.into());
+        assert_eq!(cell_parts("plain *text*"), [text("plain *text*")]);
+        assert_eq!(cell_parts(""), []);
+        assert_eq!(cell_parts("![a](x.png)"), [image("a", "x.png")]);
+        assert_eq!(
+            cell_parts("see ![a [b]](<x y.png> \"T\") now"),
+            [
+                text("see"),
+                CellPart::Image(Image {
+                    alt: "a [b]".into(),
+                    src: "x y.png".into(),
+                    title: "T".into(),
+                    html: None
+                }),
+                text("now")
+            ]
+        );
+        // A badge keeps the image, and the link around it goes.
+        assert_eq!(
+            cell_parts("[![ci](https://e.com/b.svg)](https://e.com/run)"),
+            [image("ci", "https://e.com/b.svg")]
+        );
+        assert_eq!(cell_parts("a<br>b"), [text("a\nb")]);
+        let [CellPart::Image(tag)] = &cell_parts("<img src=\"p.png\" alt='P' width=\"40\">")[..]
+        else {
+            panic!("an <img> tag is an image")
+        };
+        assert_eq!((tag.src.as_str(), tag.alt.as_str()), ("p.png", "P"));
+        // Not an image: left as the text it is.
+        assert_eq!(cell_parts("![broken](x.png"), [text("![broken](x.png")]);
     }
 
     #[test]

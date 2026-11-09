@@ -29,6 +29,13 @@ is added there in the same commit (ADR-0025).
   are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
   painted over them.
 
+### Changed
+
+- Markdown tables look and lay out like HTML's (ADR-0033): joined cells with borders, text that
+  wraps, as wide as the content wants up to the text's width, and images in cells (`![alt](src)`,
+  `<img>`, inside a link too) shown. `markdown::embeds::table` takes the document's folder before
+  the id; the `Editor` does this itself.
+
 ### Upgrading
 
 - **Apps with dialogs, or any row of buttons outside the title bar: call `patina::dialog::buttons(ui)`

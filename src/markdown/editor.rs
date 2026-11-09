@@ -1349,7 +1349,13 @@ impl Editor {
                 let original = self.paras[i].clone();
                 let response = match &mut self.paras[i] {
                     Para::Table(table) => {
-                        embeds::table(ui, table, self.id.with(("table", i)), !self.read_only)
+                        embeds::table(
+                            ui,
+                            table,
+                            self.dir.as_deref(),
+                            self.id.with(("table", i)),
+                            !self.read_only,
+                        )
                     }
                     Para::Code { lang, code } => {
                         embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
