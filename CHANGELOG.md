@@ -20,12 +20,22 @@ is added there in the same commit (ADR-0025).
   ADR-0013), shared. The font is not in `patina-ui`, because at 10 MB it takes the package over
   crates.io's size limit: apps give it one with `emoji::install` or `install_file`
   (Sector F's apps use the `patina-emoji-font` git crate in this repository; see Upgrading). The feature adds about 11 MB to the binary (ADR-0031).
+- `patina::dialog`: a row of buttons the size of the title bar's (ADR-0032). `dialog::buttons(ui)`
+  gives the buttons in a `ui` 10 by 5 px of padding, at least 24 px high, 8 px apart, as the bar's
+  (ADR-0028); `dialog::primary(ui, text)` is the button Enter presses, in the skin's accent.
+  The constants are `BUTTON_PADDING`, `BUTTON_HEIGHT` and `BUTTON_GAP`. The title bar's buttons are
+  unchanged.
 - The markdown `Editor` draws emoji in colour when both `markdown` and `emoji` are enabled: they
   are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
   painted over them.
 
 ### Upgrading
 
+- **Apps with dialogs, or any row of buttons outside the title bar: call `patina::dialog::buttons(ui)`
+  first inside the row's layout, and make the button Enter presses `patina::dialog::primary`.**
+  egui's buttons are 18 px high and look small next to the bar's. Right-align the row, the primary
+  button rightmost (`Layout::right_to_left`, adding it first). An app with its own copy of the
+  bar's button spacing can delete it. Nothing changes until you call it.
 - **Apps that show text with emoji in it: enable the `emoji` feature, install a font and show that
   text with `patina::emoji::label`.** The font isn't in `patina-ui` (10 MB is over crates.io's size
   limit) and Patina doesn't look for one: once at start-up, give it the bytes of a Noto Color
