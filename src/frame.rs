@@ -47,6 +47,30 @@ const BAR_BUTTON_HEIGHT: f32 = crate::dialog::BUTTON_HEIGHT;
 /// libadwaita's `--window-radius`, as shipped in Ubuntu's Yaru styles too.
 pub const WINDOW_RADIUS: u8 = 15;
 
+/// How the window buttons look and where they sit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowButtons {
+    /// Patina's own: minimise, maximise and close at the right, drawn in the
+    /// skin's colours.
+    Patina,
+    /// macOS's: red, yellow and green circles at the left, in that order
+    /// (close, minimise, zoom), with their glyphs shown while the pointer is
+    /// over them.
+    MacOs,
+}
+
+impl WindowButtons {
+    /// The buttons of the platform the app runs on: macOS's on macOS,
+    /// Patina's elsewhere.
+    pub fn platform() -> Self {
+        if cfg!(target_os = "macos") {
+            Self::MacOs
+        } else {
+            Self::Patina
+        }
+    }
+}
+
 /// The frame's colours.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FrameStyle {
@@ -175,10 +199,31 @@ fn maximized(ctx: &egui::Context) -> bool {
     })
 }
 
+/// Whether the window squares its corners (and drops its border and resize
+/// handles) while maximised or full screen, as GNOME does. Off by default:
+/// the window keeps its rounded corners, as on macOS and Windows. An app that
+/// wants GNOME's look turns it on once, at start-up or from a setting.
+pub fn set_square_when_maximised(ctx: &egui::Context, square: bool) {
+    ctx.data_mut(|d| d.insert_temp(square_id(), square));
+}
+
+fn square_id() -> Id {
+    Id::new("square_when_maximised")
+}
+
+/// Whether the window is square right now: it's maximised or full screen and
+/// the app asked for [`set_square_when_maximised`].
+fn squared(ctx: &egui::Context) -> bool {
+    maximized(ctx)
+        && ctx
+            .data(|d| d.get_temp::<bool>(square_id()))
+            .unwrap_or(false)
+}
+
 /// Corner rounding for the window right now: `radius`, or square while
-/// maximised or full screen, as GNOME does.
+/// maximised or full screen if the app turned on [`set_square_when_maximised`].
 pub fn corner_radius(ctx: &egui::Context, radius: u8) -> u8 {
-    if maximized(ctx) { 0 } else { radius }
+    if squared(ctx) { 0 } else { radius }
 }
 
 /// The top panel's frame for a [`TitleBar`]: the bar's colour, the header-bar
@@ -223,6 +268,7 @@ pub struct TitleBar<'a> {
     custom: bool,
     menu_bar: bool,
     minimise: bool,
+    buttons: WindowButtons,
     span: Option<egui::Rangef>,
 }
 
@@ -234,8 +280,15 @@ impl<'a> TitleBar<'a> {
             custom: true,
             menu_bar: false,
             minimise: true,
+            buttons: WindowButtons::platform(),
             span: None,
         }
+    }
+
+    /// Which window buttons to draw: [`WindowButtons::platform`] by default.
+    pub fn window_buttons(mut self, buttons: WindowButtons) -> Self {
+        self.buttons = buttons;
+        self
     }
 
     /// The bar's full height, padding and all, as given to
@@ -282,6 +335,7 @@ impl<'a> TitleBar<'a> {
             custom,
             menu_bar,
             minimise,
+            buttons: kind,
             span,
         } = self;
         let ctx = ui.ctx().clone();
@@ -310,7 +364,10 @@ impl<'a> TitleBar<'a> {
             ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(layout))
         };
         let mut buttons_left = row.right();
-        if custom {
+        let mut lights_right = row.left();
+        if custom && kind == WindowButtons::MacOs {
+            lights_right = mac_buttons(ui, row, &ctx, minimise);
+        } else if custom {
             let mut buttons = child(ui, row, egui::Layout::right_to_left(egui::Align::Center));
             buttons.spacing_mut().item_spacing.x = 4.0;
             if button(&mut buttons, &style.controls, Button::Close)
@@ -355,10 +412,13 @@ impl<'a> TitleBar<'a> {
             (bar.right() - right_ui.min_rect().left()).max(bar.right() - buttons_left);
 
         let mut left_rect = row.with_max_x(row.right() - right_width - ui.spacing().item_spacing.x);
+        left_rect.min.x = left_rect.min.x.max(lights_right);
         if menu_bar {
             // The first menu's name stays where egui's menu bar put it, its
             // box reaching into the bar's padding.
-            left_rect.min.x -= MENU_PADDING - EGUI_MENU_PADDING;
+            if lights_right == row.left() {
+                left_rect.min.x -= MENU_PADDING - EGUI_MENU_PADDING;
+            }
             if let Some(span) = span {
                 left_rect = egui::Rect::from_x_y_ranges(left_rect.x_range(), span);
             }
@@ -514,6 +574,124 @@ enum Button {
     Maximize,
     Restore,
     Close,
+}
+
+/// macOS's traffic lights, from `row`'s left edge. Returns the x where the
+/// app's own controls can start.
+fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise: bool) -> f32 {
+    // Measured from `standardWindowButton` on macOS 27: 14 pt circles 9 pt apart. The
+    // first is 9 pt from the window's edge there; 14 here, since Patina's window corner is
+    // tighter than macOS's and the lights looked crowded into it.
+    const DIAMETER: f32 = 14.0;
+    const GAP: f32 = 9.0;
+    const INSET: f32 = 14.0;
+    let can = can_minimise_and_maximise();
+    let lights: &[(Button, Color32, &str)] = &[
+        (Button::Close, Color32::from_rgb(0xff, 0x5f, 0x57), "Close"),
+        (
+            Button::Minimize,
+            Color32::from_rgb(0xfe, 0xbc, 0x2e),
+            "Minimise",
+        ),
+        (
+            Button::Maximize,
+            Color32::from_rgb(0x28, 0xc8, 0x40),
+            "Maximise",
+        ),
+    ];
+    let focused = ctx.input(|i| i.viewport().focused.unwrap_or(true));
+    let shown: Vec<_> = lights
+        .iter()
+        .filter(|(k, ..)| match k {
+            Button::Close => true,
+            Button::Minimize => can && minimise,
+            _ => can,
+        })
+        .collect();
+    // `row` starts inside the header's padding; the lights count from the window's edge.
+    let start = row.left() - f32::from(HEADER_MARGIN.left) + INSET;
+    let mut x = start;
+    let mut rects = Vec::new();
+    for _ in &shown {
+        rects.push(egui::Rect::from_center_size(
+            egui::pos2(x + DIAMETER / 2.0, row.center().y),
+            vec2(DIAMETER, DIAMETER),
+        ));
+        x += DIAMETER + GAP;
+    }
+    let right = x - GAP;
+    let group = egui::Rect::from_min_max(
+        egui::pos2(start, row.top()),
+        egui::pos2(right, row.bottom()),
+    );
+    // The glyphs show while the pointer is anywhere over the three.
+    let over = ctx
+        .input(|i| i.pointer.hover_pos())
+        .is_some_and(|p| group.contains(p));
+    for ((kind, colour, tip), rect) in shown.into_iter().zip(rects) {
+        let resp = ui
+            .interact(
+                rect.expand2(vec2(GAP / 2.0, 6.0)),
+                Id::new(("mac_light", *tip)),
+                Sense::click(),
+            )
+            .on_hover_text(*tip);
+        let fill = if !focused && !over {
+            // A window that isn't in front greys its lights.
+            Color32::from_gray(0x80)
+        } else if resp.is_pointer_button_down_on() {
+            colour.gamma_multiply(0.7)
+        } else {
+            *colour
+        };
+        let painter = ui.painter();
+        painter.circle_filled(rect.center(), DIAMETER / 2.0, fill);
+        painter.circle_stroke(
+            rect.center(),
+            DIAMETER / 2.0,
+            Stroke::new(0.5, Color32::from_black_alpha(0x40)),
+        );
+        if over {
+            let ink = Color32::from_black_alpha(0xb0);
+            let stroke = Stroke::new(1.3, ink);
+            let c = rect.center();
+            let r = 2.8;
+            match kind {
+                Button::Close => {
+                    painter.line_segment([c + vec2(-r, -r), c + vec2(r, r)], stroke);
+                    painter.line_segment([c + vec2(-r, r), c + vec2(r, -r)], stroke);
+                }
+                Button::Minimize => {
+                    painter.line_segment([c + vec2(-r - 0.6, 0.0), c + vec2(r + 0.6, 0.0)], stroke);
+                }
+                _ => {
+                    // Zoom's two opposing triangles.
+                    let max = maximized(ctx);
+                    let (a, b) = if max { (-1.0, 1.0) } else { (1.0, -1.0) };
+                    for sign in [a, b] {
+                        let tip = c + vec2(sign * r, -sign * r);
+                        painter.add(egui::Shape::convex_polygon(
+                            vec![
+                                tip,
+                                tip + vec2(-sign * 3.3, 0.0),
+                                tip + vec2(0.0, sign * 3.3),
+                            ],
+                            ink,
+                            Stroke::NONE,
+                        ));
+                    }
+                }
+            }
+        }
+        if resp.clicked() {
+            match kind {
+                Button::Close => ctx.send_viewport_cmd(ViewportCommand::Close),
+                Button::Minimize => ctx.send_viewport_cmd(ViewportCommand::Minimized(true)),
+                _ => ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized(ctx))),
+            }
+        }
+    }
+    right + CONTROLS_GAP + 4.0
 }
 
 fn window_menu(ui: &mut egui::Ui, ctx: &egui::Context) {
@@ -769,7 +947,7 @@ fn rounded_fill(rect: egui::Rect, cr: egui::CornerRadius, fill: Color32) -> egui
 /// The border and resize handles. Call after everything else is drawn, so
 /// the handles sit above the floating windows along the edges.
 pub fn edges(ctx: &egui::Context, radius: u8, border: Color32) {
-    if maximized(ctx) {
+    if squared(ctx) {
         return;
     }
     let window = ctx.content_rect();
@@ -784,6 +962,10 @@ pub fn edges(ctx: &egui::Context, radius: u8, border: Color32) {
         Stroke::new(1.0, border),
         egui::StrokeKind::Inside,
     );
+    // A maximised window can't be resized by its edges.
+    if maximized(ctx) {
+        return;
+    }
 
     let Some(pos) = ctx.input(|i| i.pointer.hover_pos()) else {
         return;

@@ -1,6 +1,6 @@
 [package]
 name = "patina-ui"
-version = "0.1.16"
+version = "0.1.17"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "Patina: the window frame, components and design language shared by Photograph, UnAmp and other egui desktop apps"
@@ -50,6 +50,10 @@ wayland-client = "0.31"
 # dlopen, as winit has it: libwayland-client is loaded when the app runs, not needed to build.
 wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
 wayland-protocols-plasma = { version = "0.3", default-features = false, features = ["client"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# The menu bar on macOS (ADR-0036); not built anywhere else.
+muda = { version = "0.21", default-features = false }
 
 [dev-dependencies]
 # The font the emoji tests install (no version: it is not published).

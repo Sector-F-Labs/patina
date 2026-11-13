@@ -777,9 +777,10 @@ mod tests {
         };
         let plain = Skin::parse("format = 1\nname = \"Plain\"\nbase = \"dark\"").unwrap();
         assert_eq!(size(&plain), crate::dialog::BUTTON_PADDING);
-        let own =
-            Skin::parse("format = 1\nname = \"Own\"\nbase = \"dark\"\n[controls]\nbutton_padding = [4, 1]")
-                .unwrap();
+        let own = Skin::parse(
+            "format = 1\nname = \"Own\"\nbase = \"dark\"\n[controls]\nbutton_padding = [4, 1]",
+        )
+        .unwrap();
         assert_eq!(size(&own), egui::vec2(4.0, 1.0));
         let wild = Skin::parse(
             "format = 1\nname = \"Wild\"\nbase = \"dark\"\n[controls]\nbutton_padding = [90, -3]",
