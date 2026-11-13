@@ -579,11 +579,12 @@ enum Button {
 /// macOS's traffic lights, from `row`'s left edge. Returns the x where the
 /// app's own controls can start.
 fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise: bool) -> f32 {
-    // Measured from `standardWindowButton` on macOS 27: 14 pt circles 9 pt apart,
-    // the first 9 pt from the window's left edge.
+    // Measured from `standardWindowButton` on macOS 27: 14 pt circles 9 pt apart. The
+    // first is 9 pt from the window's edge there; 14 here, since Patina's window corner is
+    // tighter than macOS's and the lights looked crowded into it.
     const DIAMETER: f32 = 14.0;
     const GAP: f32 = 9.0;
-    const INSET: f32 = 9.0;
+    const INSET: f32 = 14.0;
     let can = can_minimise_and_maximise();
     let lights: &[(Button, Color32, &str)] = &[
         (Button::Close, Color32::from_rgb(0xff, 0x5f, 0x57), "Close"),
