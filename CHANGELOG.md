@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.18 — 2026-11-13
+
 ### Added
 
 - `Menus::app_name("Photograph")`: the app's name as macOS's menu bar shows it, and the title of
