@@ -57,6 +57,9 @@ muda = { version = "0.21", default-features = false }
 # The app's name in the menu bar, for a binary run outside an .app (menu::Menus::app_name).
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
 
+# Minimising a window on macOS (frame::minimise_window).
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow"] }
+
 [dev-dependencies]
 # The font the emoji tests install (no version: it is not published).
 patina-emoji-font = { path = "emoji-font" }
