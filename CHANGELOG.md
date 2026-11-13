@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.19 — 2026-11-14
+
 ### Fixed
 
 - A window minimised from Patina's own buttons stayed frozen on macOS after it was restored from
