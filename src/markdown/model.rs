@@ -325,9 +325,8 @@ pub fn cell_parts(cell: &str) -> Vec<CellPart> {
         let found = if rest.starts_with("![") {
             markdown_image_at(rest)
         } else if rest.starts_with("<img") {
-            rest.find('>').and_then(|end| {
-                html_image(&rest[..=end]).map(|image| (image, end + 1))
-            })
+            rest.find('>')
+                .and_then(|end| html_image(&rest[..=end]).map(|image| (image, end + 1)))
         } else {
             None
         };

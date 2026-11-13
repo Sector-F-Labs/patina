@@ -310,7 +310,9 @@ mod tests {
     #[test]
     fn a_font_without_emoji_is_refused() {
         // Ubuntu's text font has no colour images; and neither is a bare file.
-        assert!(!usable(include_bytes!("../assets/fonts/Ubuntu-Variable.ttf")));
+        assert!(!usable(include_bytes!(
+            "../assets/fonts/Ubuntu-Variable.ttf"
+        )));
         assert!(!usable(b"not a font"));
         assert!(usable(patina_emoji_font::FONT));
     }

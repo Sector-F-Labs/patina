@@ -119,7 +119,8 @@ pub fn table(
             rects.push(x);
             x += widths[c];
         }
-        let band = egui::Rect::from_min_size(egui::pos2(origin.x, y), egui::vec2(width, row_height));
+        let band =
+            egui::Rect::from_min_size(egui::pos2(origin.x, y), egui::vec2(width, row_height));
         if r == 0 {
             shapes.push(egui::Shape::rect_filled(band, 0.0, visuals.faint_bg_color));
         }
@@ -131,9 +132,21 @@ pub fn table(
         y += row_height;
     }
     let table_rect = egui::Rect::from_min_max(origin, egui::pos2(origin.x + width, y));
-    shapes.push(egui::Shape::hline(table_rect.x_range(), table_rect.top(), stroke));
-    shapes.push(egui::Shape::vline(table_rect.left(), table_rect.y_range(), stroke));
-    shapes.push(egui::Shape::vline(table_rect.right(), table_rect.y_range(), stroke));
+    shapes.push(egui::Shape::hline(
+        table_rect.x_range(),
+        table_rect.top(),
+        stroke,
+    ));
+    shapes.push(egui::Shape::vline(
+        table_rect.left(),
+        table_rect.y_range(),
+        stroke,
+    ));
+    shapes.push(egui::Shape::vline(
+        table_rect.right(),
+        table_rect.y_range(),
+        stroke,
+    ));
     ui.painter().set(backdrop, egui::Shape::Vec(shapes));
     ui.allocate_rect(table_rect, egui::Sense::hover());
 
@@ -215,10 +228,7 @@ fn content_width(
     };
     let text_width = |text: &str| -> (f32, f32) {
         let most = text.lines().map(&measure).fold(0.0, f32::max);
-        let least = text
-            .split_whitespace()
-            .map(&measure)
-            .fold(0.0, f32::max);
+        let least = text.split_whitespace().map(&measure).fold(0.0, f32::max);
         (least, most)
     };
     if !parts.iter().any(|p| matches!(p, CellPart::Image(_))) {
@@ -229,8 +239,8 @@ fn content_width(
         let (l, m) = match part {
             CellPart::Text(text) => text_width(text),
             CellPart::Image(image) => {
-                let natural = natural_size(ui.ctx(), &image_uri(&image.src, dir))
-                    .unwrap_or(PENDING_IMAGE);
+                let natural =
+                    natural_size(ui.ctx(), &image_uri(&image.src, dir)).unwrap_or(PENDING_IMAGE);
                 (natural.x, natural.x)
             }
         };
@@ -324,11 +334,7 @@ fn show_cell(
     }
     // A &str shows the text, selectable, and edits nothing.
     let mut shown = source.as_str();
-    let text: &mut dyn egui::TextBuffer = if cell.editable {
-        source
-    } else {
-        &mut shown
-    };
+    let text: &mut dyn egui::TextBuffer = if cell.editable { source } else { &mut shown };
     let mut edit = egui::TextEdit::multiline(text)
         .id(cell.id)
         .frame(egui::Frame::NONE)
@@ -345,7 +351,9 @@ fn show_cell(
     let response = ui.add(edit);
     result.changed = response.changed();
     if has_images && cell.editable {
-        let focus_wanted: bool = ui.data(|d| d.get_temp(cell.id.with("focus"))).unwrap_or(false);
+        let focus_wanted: bool = ui
+            .data(|d| d.get_temp(cell.id.with("focus")))
+            .unwrap_or(false);
         if focus_wanted {
             response.request_focus();
             ui.data_mut(|d| d.insert_temp(cell.id.with("focus"), false));
@@ -377,7 +385,11 @@ fn show_parts(ui: &mut egui::Ui, parts: &[CellPart], cell: &CellView, width: f32
                     .strip_prefix("file://")
                     .is_some_and(|path| !Path::new(path).exists());
                 if missing {
-                    let note = if image.alt.is_empty() { &image.src } else { &image.alt };
+                    let note = if image.alt.is_empty() {
+                        &image.src
+                    } else {
+                        &image.alt
+                    };
                     ui.add(egui::Label::new(RichText::new(format!("🖼 {note}")).weak()).wrap());
                     continue;
                 }
@@ -851,7 +863,10 @@ mod tests {
     #[test]
     fn a_table_that_fits_takes_only_what_it_wants() {
         // Wants 100 and 60 in 500: nothing is stretched.
-        assert_eq!(distribute(&[40.0, 30.0], &[100.0, 60.0], 500.0), [100.0, 60.0]);
+        assert_eq!(
+            distribute(&[40.0, 30.0], &[100.0, 60.0], 500.0),
+            [100.0, 60.0]
+        );
     }
 
     #[test]
@@ -859,7 +874,10 @@ mod tests {
         // An image column that won't shrink (128) beside text that will (60..600).
         let widths = distribute(&[128.0, 60.0], &[128.0, 600.0], 400.0);
         assert_eq!(widths[0], 128.0, "the image keeps its width");
-        assert!((widths.iter().sum::<f32>() - 400.0).abs() < 0.01, "the text takes the rest");
+        assert!(
+            (widths.iter().sum::<f32>() - 400.0).abs() < 0.01,
+            "the text takes the rest"
+        );
         // Even the least doesn't fit: everything shrinks, to a floor.
         let tight = distribute(&[300.0, 300.0], &[300.0, 300.0], 300.0);
         assert!(tight.iter().all(|w| *w == 150.0));

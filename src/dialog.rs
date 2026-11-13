@@ -100,7 +100,8 @@ pub fn set_input_size(ctx: &Context, size: InputSize) {
 
 /// The size of a text input now: the skin's or the app's, else the default.
 pub fn input_size(ctx: &Context) -> InputSize {
-    ctx.data(|d| d.get_temp(input_size_id())).unwrap_or_default()
+    ctx.data(|d| d.get_temp(input_size_id()))
+        .unwrap_or_default()
 }
 
 /// A single-line text input at the size [`input_size`] gives: padded as a
@@ -115,7 +116,10 @@ pub fn text_edit<'t>(ui: &Ui, text: &'t mut String) -> TextEdit<'t> {
     let line = ui.text_style_height(&egui::TextStyle::Body);
     let down = size.padding.y.max(((size.height - line) / 2.0).ceil());
     TextEdit::singleline(text)
-        .margin(Margin::symmetric(size.padding.x.round() as i8, down.round() as i8))
+        .margin(Margin::symmetric(
+            size.padding.x.round() as i8,
+            down.round() as i8,
+        ))
         .min_size(vec2(0.0, size.height))
 }
 
@@ -153,7 +157,10 @@ mod tests {
         let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
             let mut text = String::new();
             let height = ui.add(text_edit(ui, &mut text)).rect.height();
-            assert!((BUTTON_HEIGHT..=BUTTON_HEIGHT + 1.0).contains(&height), "{height}");
+            assert!(
+                (BUTTON_HEIGHT..=BUTTON_HEIGHT + 1.0).contains(&height),
+                "{height}"
+            );
         });
         set_input_size(
             &ctx,
@@ -167,7 +174,10 @@ mod tests {
         let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
             let mut text = String::new();
             let height = ui.add(text_edit(ui, &mut text)).rect.height();
-            assert!((InputSize::HEIGHTS.1..=InputSize::HEIGHTS.1 + 1.0).contains(&height), "{height}");
+            assert!(
+                (InputSize::HEIGHTS.1..=InputSize::HEIGHTS.1 + 1.0).contains(&height),
+                "{height}"
+            );
         });
     }
 

@@ -1348,15 +1348,13 @@ impl Editor {
                 ui.add_space(6.0);
                 let original = self.paras[i].clone();
                 let response = match &mut self.paras[i] {
-                    Para::Table(table) => {
-                        embeds::table(
-                            ui,
-                            table,
-                            self.dir.as_deref(),
-                            self.id.with(("table", i)),
-                            !self.read_only,
-                        )
-                    }
+                    Para::Table(table) => embeds::table(
+                        ui,
+                        table,
+                        self.dir.as_deref(),
+                        self.id.with(("table", i)),
+                        !self.read_only,
+                    ),
                     Para::Code { lang, code } => {
                         embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
                     }
@@ -1939,7 +1937,12 @@ fn layout_job(
             f.underline = Stroke::new(1.0, f.color);
             job.append(text, 0.0, f);
         }
-        append(&mut job, &span.text, format(&span.styles, look, v), &mut found);
+        append(
+            &mut job,
+            &span.text,
+            format(&span.styles, look, v),
+            &mut found,
+        );
     }
     if let Some((at, text)) = &preedit_at
         && *at == spans.len()
