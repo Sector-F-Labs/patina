@@ -51,6 +51,10 @@ wayland-client = "0.31"
 wayland-backend = { version = "0.3", features = ["client_system", "dlopen"] }
 wayland-protocols-plasma = { version = "0.3", default-features = false, features = ["client"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+# The menu bar on macOS (ADR-0036); not built anywhere else.
+muda = { version = "0.21", default-features = false }
+
 [dev-dependencies]
 # The font the emoji tests install (no version: it is not published).
 patina-emoji-font = { path = "emoji-font" }

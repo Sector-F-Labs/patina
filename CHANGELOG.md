@@ -19,6 +19,14 @@ is added there in the same commit (ADR-0025).
 
 ### Added
 
+- `patina::menu::Menus<A>` (ADR-0036, Proposed): an app's menus as data — `Entry::item` with
+  `.shortcut`, `.enabled`, `.check`, `.radio` and `.role`, `Entry::separator`, and
+  `Entry::submenu` to any depth — and `menus.show(ui) -> Option<A>`, which draws them as egui
+  menus in the title bar's left slot and, on macOS, in the screen's menu bar (through `muda`,
+  built only there; `menu::set_native(ctx, false)` keeps them in the window). Shortcuts are the
+  model's: it handles them on both. Items with a `Role` (About, Settings, Quit) go to the app
+  menu on macOS. `ui.menu_button` still works; apps move over one at a time. Nothing to change in
+  an app. The gallery's menus use it.
 - `TitleBar::window_buttons(WindowButtons)`: `WindowButtons::MacOs` draws red, yellow and green
   traffic lights at the left, `Patina` the existing buttons at the right. The default is
   `WindowButtons::platform()`: macOS's on macOS, Patina's elsewhere. Nothing to change in an app.

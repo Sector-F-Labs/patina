@@ -14,6 +14,7 @@ use eframe::egui;
 use patina::frame::{self, FrameStyle, TitleBar};
 use patina::ime;
 use patina::kinetic;
+use patina::menu::{Entry, Menus, Role};
 use patina::skin::{self, Skin};
 use patina::tabs::{self, TabAction, TabStrip};
 use patina::tree::FolderTree;
@@ -39,6 +40,11 @@ fn main() -> eframe::Result {
 
 struct Gallery {
     custom_frame: bool,
+    /// Zoom in percent, and whether the sidebar shows, from the View menu.
+    zoom: u32,
+    sidebar: bool,
+    /// Whether a maximised window squares its corners (off by default).
+    square: bool,
     skins: Vec<Skin>,
     /// Index into `skins`.
     skin: usize,
@@ -83,6 +89,9 @@ impl Gallery {
             .map_or("/".into(), |n| n.to_string_lossy().into_owned());
         let gallery = Self {
             custom_frame: true,
+            zoom: 100,
+            sidebar: true,
+            square: false,
             skins,
             skin,
             light_dark,
@@ -112,66 +121,170 @@ impl Gallery {
     }
 
     /// The skin menu every app has (ADR-0017): only controls, reporting to the status bar.
-    fn skin_menu(&mut self, ui: &mut egui::Ui) {
-        // Size the menu to its widest entry instead of wrapping entries to its first width.
-        ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
-        let ctx = ui.ctx().clone();
-        let mut changed = false;
+    /// The Skin menu's entries (ADR-0017): the skins, light or dark while Default is in use, and
+    /// the skins folder.
+    fn skin_entries(&self) -> Vec<Entry<MenuAction>> {
+        let mut e = Vec::new();
         for (i, skin) in self.skins.iter().enumerate() {
             let label = match &skin.author {
                 Some(author) if skin.path.is_some() => format!("{} — {author}", skin.name),
                 _ => skin.name.clone(),
             };
-            let resp = ui.radio_value(&mut self.skin, i, label);
-            let resp = match (&skin.path, &skin.author) {
-                (Some(path), _) => resp.on_hover_text(path.display().to_string()),
-                (None, Some(author)) => resp.on_hover_text(format!("Built in, by {author}")),
-                (None, None) => resp.on_hover_text("Stock egui"),
-            };
-            changed |= resp.clicked();
+            e.push(Entry::item(label, MenuAction::Skin(i)).radio(self.skin == i));
         }
-        ui.separator();
-        ui.add_enabled_ui(self.skins[self.skin].follows_desktop(), |ui| {
-            for (value, label) in [
-                (egui::ThemePreference::System, "Follow desktop"),
-                (egui::ThemePreference::Light, "Light"),
-                (egui::ThemePreference::Dark, "Dark"),
-            ] {
-                changed |= ui.radio_value(&mut self.light_dark, value, label).clicked();
-            }
-        });
-        ui.separator();
-        if ui.button("Reload skins").clicked() {
-            self.reload_skins();
-            changed = true;
-        }
-        if let Some(dir) = skin::app_dir(GALLERY) {
-            let resp = ui.button("Copy built-in skins to folder").on_hover_text(
-                "Puts editable copies in the skins folder; never overwrites existing files",
+        e.push(Entry::separator());
+        let follows = self.skins[self.skin].follows_desktop();
+        for (value, label) in [
+            (egui::ThemePreference::System, "Follow desktop"),
+            (egui::ThemePreference::Light, "Light"),
+            (egui::ThemePreference::Dark, "Dark"),
+        ] {
+            e.push(
+                Entry::item(label, MenuAction::Theme(value))
+                    .radio(self.light_dark == value)
+                    .enabled(follows),
             );
-            if resp.clicked() {
-                self.status = Some(match skin::export_built_ins(&dir, skin::BUILT_IN) {
-                    Ok(export) => {
-                        // The copies share the built-ins' names, so after a reload they're the
-                        // versions in use.
-                        self.reload_skins();
-                        changed = true;
-                        Status::info(export_summary(&export.copied, &export.skipped))
-                    }
-                    Err(e) => Status::error(format!("Couldn't copy skins: {e}")),
-                });
+        }
+        e.push(Entry::separator());
+        e.push(Entry::item("Reload skins", MenuAction::ReloadSkins));
+        if skin::app_dir(GALLERY).is_some() {
+            e.push(Entry::item(
+                "Copy built-in skins to folder",
+                MenuAction::ExportSkins,
+            ));
+            e.push(Entry::item(
+                "Open skins folder",
+                MenuAction::OpenSkinsFolder,
+            ));
+        }
+        e
+    }
+
+    /// Every menu, as data: Patina draws it in the window, or on macOS in the menu bar (ADR-0036).
+    fn menus(&self) -> Menus<MenuAction> {
+        use egui::{Key, KeyboardShortcut as K, Modifiers as M};
+        let zoom = |z: u32| Entry::item(format!("{z}%"), MenuAction::Zoom(z)).radio(self.zoom == z);
+        Menus::new()
+            .menu(
+                "File",
+                [
+                    Entry::item("New Tab", MenuAction::Tab(TabAction::New)),
+                    Entry::item("Close Tab", MenuAction::Tab(TabAction::Close(self.tab)))
+                        .enabled(self.tabs.len() > 1),
+                    Entry::separator(),
+                    Entry::item("About Gallery", MenuAction::About).role(Role::About),
+                    Entry::item("Settings…", MenuAction::Settings).role(Role::Settings),
+                    Entry::separator(),
+                    Entry::item("Quit", MenuAction::Quit).role(Role::Quit),
+                ],
+            )
+            .menu(
+                "Edit",
+                [
+                    Entry::item("Undo", MenuAction::Say("Undo"))
+                        .shortcut(K::new(M::COMMAND, Key::Z))
+                        .enabled(false),
+                    Entry::item("Redo", MenuAction::Say("Redo"))
+                        .shortcut(K::new(M::COMMAND | M::SHIFT, Key::Z))
+                        .enabled(false),
+                    Entry::separator(),
+                    Entry::item("Cut", MenuAction::Say("Cut")).shortcut(K::new(M::COMMAND, Key::X)),
+                    Entry::item("Copy", MenuAction::Say("Copy"))
+                        .shortcut(K::new(M::COMMAND, Key::C)),
+                    Entry::item("Paste", MenuAction::Say("Paste"))
+                        .shortcut(K::new(M::COMMAND, Key::V)),
+                ],
+            )
+            .menu(
+                "View",
+                [
+                    Entry::item("Patina frame", MenuAction::PatinaFrame).check(self.custom_frame),
+                    Entry::separator(),
+                    Entry::submenu("Zoom", [zoom(75), zoom(100), zoom(125), zoom(150)]),
+                    Entry::item("Reset Zoom", MenuAction::Zoom(100))
+                        .shortcut(K::new(M::COMMAND, Key::Num0))
+                        .enabled(self.zoom != 100),
+                    Entry::separator(),
+                    Entry::submenu(
+                        "Panels",
+                        [
+                            Entry::item("Sidebar", MenuAction::Sidebar).check(self.sidebar),
+                            Entry::submenu(
+                                "Window",
+                                [Entry::item(
+                                    "Square corners when maximised",
+                                    MenuAction::SquareCorners,
+                                )
+                                .check(self.square)],
+                            ),
+                        ],
+                    ),
+                ],
+            )
+            .menu("Skin", self.skin_entries())
+    }
+
+    fn menu_action(&mut self, ctx: &egui::Context, action: MenuAction) {
+        let mut changed = false;
+        match action {
+            MenuAction::Tab(a) => self.tab_action(a),
+            MenuAction::About => {
+                self.status = Some(Status::info(format!(
+                    "Patina gallery {}",
+                    env!("CARGO_PKG_VERSION")
+                )));
             }
-            if ui
-                .button("Open skins folder")
-                .on_hover_text(dir.display().to_string())
-                .clicked()
-            {
-                let _ = std::fs::create_dir_all(&dir);
-                let _ = patina::open::path(&dir);
+            MenuAction::Settings => self.status = Some(Status::info("Settings…")),
+            MenuAction::Quit => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            MenuAction::Say(what) => self.status = Some(Status::info(what)),
+            MenuAction::PatinaFrame => {
+                self.custom_frame = !self.custom_frame;
+                ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(!self.custom_frame));
+            }
+            MenuAction::Zoom(z) => {
+                self.zoom = z;
+                ctx.set_zoom_factor(z as f32 / 100.0);
+            }
+            MenuAction::Sidebar => self.sidebar = !self.sidebar,
+            MenuAction::SquareCorners => {
+                self.square = !self.square;
+                frame::set_square_when_maximised(ctx, self.square);
+            }
+            MenuAction::Skin(i) => {
+                self.skin = i;
+                changed = true;
+            }
+            MenuAction::Theme(t) => {
+                self.light_dark = t;
+                changed = true;
+            }
+            MenuAction::ReloadSkins => {
+                self.reload_skins();
+                changed = true;
+            }
+            MenuAction::ExportSkins => {
+                if let Some(dir) = skin::app_dir(GALLERY) {
+                    self.status = Some(match skin::export_built_ins(&dir, skin::BUILT_IN) {
+                        Ok(export) => {
+                            // The copies share the built-ins' names, so after a reload they're
+                            // the versions in use.
+                            self.reload_skins();
+                            changed = true;
+                            Status::info(export_summary(&export.copied, &export.skipped))
+                        }
+                        Err(e) => Status::error(format!("Couldn't copy skins: {e}")),
+                    });
+                }
+            }
+            MenuAction::OpenSkinsFolder => {
+                if let Some(dir) = skin::app_dir(GALLERY) {
+                    let _ = std::fs::create_dir_all(&dir);
+                    let _ = patina::open::path(&dir);
+                }
             }
         }
         if changed {
-            self.apply_skin(&ctx);
+            self.apply_skin(ctx);
         }
     }
 
@@ -222,8 +335,8 @@ impl Gallery {
         style: &FrameStyle,
         span: egui::Rangef,
     ) -> Option<TabAction> {
-        let ctx = ui.ctx().clone();
         let mut action = None;
+        let mut menu = None;
         // No title: the tabs take its place.
         TitleBar::new("", style)
             .custom(self.custom_frame)
@@ -232,17 +345,8 @@ impl Gallery {
             .show(
                 ui,
                 |ui| {
-                    ui.menu_button("View", |ui| {
-                        if ui
-                            .checkbox(&mut self.custom_frame, "Patina frame")
-                            .changed()
-                        {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Decorations(
-                                !self.custom_frame,
-                            ));
-                        }
-                    });
-                    ui.menu_button("Skin", |ui| self.skin_menu(ui));
+                    // On macOS these are in the menu bar and nothing is drawn here.
+                    menu = self.menus().show(ui);
                     action = TabStrip::new(&self.tabs, self.tab, style)
                         .span(span)
                         .show(ui);
@@ -252,6 +356,9 @@ impl Gallery {
                     ui.label(egui::RichText::new("right-hand controls").weak());
                 },
             );
+        if let Some(menu) = menu {
+            self.menu_action(ui.ctx(), menu);
+        }
         action
     }
 
@@ -372,6 +479,26 @@ struct Status {
     text: String,
 }
 
+/// What the menus ask for.
+#[derive(Clone)]
+enum MenuAction {
+    Tab(TabAction),
+    About,
+    Settings,
+    Quit,
+    /// A menu item with nothing behind it but a message in the status bar.
+    Say(&'static str),
+    PatinaFrame,
+    Zoom(u32),
+    Sidebar,
+    SquareCorners,
+    Skin(usize),
+    Theme(egui::ThemePreference),
+    ReloadSkins,
+    ExportSkins,
+    OpenSkinsFolder,
+}
+
 #[allow(dead_code)] // The gallery has nothing to warn about.
 enum Level {
     Error,
@@ -455,17 +582,19 @@ impl eframe::App for Gallery {
                     }),
             )
             .show(ui, |ui| self.status_bar(ui));
-        egui::Panel::left("sidebar")
-            .frame(egui::Frame::side_top_panel(ui.style()))
-            .default_size(240.0)
-            .show(ui, |ui| {
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    if let Some(path) = self.tree.show(ui, &self.current.clone()) {
-                        self.tree.reveal(&path);
-                        self.current = path;
-                    }
+        if self.sidebar {
+            egui::Panel::left("sidebar")
+                .frame(egui::Frame::side_top_panel(ui.style()))
+                .default_size(240.0)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        if let Some(path) = self.tree.show(ui, &self.current.clone()) {
+                            self.tree.reveal(&path);
+                            self.current = path;
+                        }
+                    });
                 });
-            });
+        }
 
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(ui.style()))
