@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.17 — 2026-11-13
+
 ### Changed
 
 - A maximised window keeps its rounded corners, border and the window shadow's shape, as on macOS
