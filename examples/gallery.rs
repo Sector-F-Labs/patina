@@ -289,8 +289,19 @@ impl Gallery {
                     let _ = ui.add_enabled(false, egui::Button::new("Disabled"));
                 });
                 ui.end_row();
-                ui.label("Text");
-                ui.text_edit_singleline(&mut self.text);
+                ui.label("Text input");
+                ui.horizontal(|ui| {
+                    // Beside a row of dialog buttons, to compare their heights: an
+                    // input is a button's size (ADR-0034).
+                    ui.add(
+                        patina::dialog::text_edit(ui, &mut self.text)
+                            .hint_text("Text input")
+                            .desired_width(200.0),
+                    );
+                    patina::dialog::buttons(ui);
+                    let _ = ui.button("Button");
+                    let _ = ui.add(patina::dialog::primary(ui, "Primary"));
+                });
                 ui.end_row();
                 ui.label("Slider");
                 ui.add(egui::Slider::new(&mut self.value, 0.0..=1.0));
@@ -405,8 +416,12 @@ fn load_skins() -> (Vec<Skin>, Vec<String>) {
 }
 
 impl eframe::App for Gallery {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, eframe_frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // The window draws its own frame, so the compositor is asked for its drop shadow (once).
+        if self.custom_frame {
+            frame::shadow::request(eframe_frame);
+        }
         self.tree.poll();
         let style = self.skins[self.skin].frame_style(ui.visuals());
         let radius = if self.custom_frame {

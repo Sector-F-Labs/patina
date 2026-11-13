@@ -38,10 +38,11 @@ const HEADER_MARGIN: egui::Margin = egui::Margin::symmetric(12, 8);
 const MENU_PADDING: f32 = 10.0;
 /// egui's, in its `menu_style`.
 const EGUI_MENU_PADDING: f32 = 2.0;
-/// Padding inside the bar's buttons, Photograph's Render and Edit (ADR-0028).
-const BAR_BUTTON_PADDING: egui::Vec2 = vec2(10.0, 5.0);
+/// Padding inside the bar's buttons, Photograph's Render and Edit (ADR-0028);
+/// dialogs' are the same (ADR-0032).
+const BAR_BUTTON_PADDING: egui::Vec2 = crate::dialog::BUTTON_PADDING;
 /// The bar's buttons are at least this high (ADR-0022, ADR-0028).
-const BAR_BUTTON_HEIGHT: f32 = 24.0;
+const BAR_BUTTON_HEIGHT: f32 = crate::dialog::BUTTON_HEIGHT;
 
 /// libadwaita's `--window-radius`, as shipped in Ubuntu's Yaru styles too.
 pub const WINDOW_RADIUS: u8 = 15;

@@ -116,6 +116,14 @@ pub struct Controls {
     pub text: Option<Hex>,
     pub text_hover: Option<Hex>,
     pub border: Option<Hex>,
+    /// Padding inside text inputs, `[across, down]` in px; 10 by 5, a button's, when unset.
+    pub input_padding: Option<[f32; 2]>,
+    /// Least height of a text input in px; 24, a button's, when unset.
+    pub input_height: Option<f32>,
+    /// Padding inside buttons and the controls drawn like them (drop-downs,
+    /// drag values, selectable labels), `[across, down]` in px; 10 by 5, the title
+    /// bar's, when unset. `[4, 1]` is egui's.
+    pub button_padding: Option<[f32; 2]>,
 }
 
 /// The app's own window frame: its title bar, edge and corners.
@@ -232,13 +240,20 @@ impl Skin {
     /// fixes egui's light or dark theme, in both of egui's slots so a desktop switch can't
     /// swap it out.
     pub fn apply(&self, ctx: &egui::Context) {
+        crate::dialog::set_input_size(ctx, self.input_size());
+        let spacing = self.spacing();
         let Some(base) = self.base else {
             ctx.set_theme(ThemePreference::System);
             for slot in [EguiTheme::Dark, EguiTheme::Light] {
                 ctx.set_style_of(
                     slot,
                     egui::Style {
-                        visuals: slot.default_visuals(),
+                        visuals: {
+                            let mut v = slot.default_visuals();
+                            steady_visuals(&mut v);
+                            v
+                        },
+                        spacing: spacing.clone(),
                         ..Default::default()
                     },
                 );
@@ -256,10 +271,41 @@ impl Skin {
                 slot,
                 egui::Style {
                     visuals: visuals.clone(),
+                    spacing: spacing.clone(),
                     ..Default::default()
                 },
             );
         }
+    }
+
+    /// egui's spacing with the skin's button padding: `[controls] button_padding`,
+    /// held to 0 to 24 px, else a title bar button's (ADR-0035).
+    pub fn spacing(&self) -> egui::Spacing {
+        let [x, y] = self.controls.button_padding.unwrap_or({
+            let d = crate::dialog::BUTTON_PADDING;
+            [d.x, d.y]
+        });
+        egui::Spacing {
+            button_padding: egui::vec2(
+                x.clamp(0.0, crate::dialog::InputSize::MAX_PADDING),
+                y.clamp(0.0, crate::dialog::InputSize::MAX_PADDING),
+            ),
+            ..Default::default()
+        }
+    }
+
+    /// How big the skin makes text inputs: `[controls] input_padding` and
+    /// `input_height` over a button's size, held to sane limits.
+    pub fn input_size(&self) -> crate::dialog::InputSize {
+        let d = crate::dialog::InputSize::default();
+        crate::dialog::InputSize {
+            padding: self
+                .controls
+                .input_padding
+                .map_or(d.padding, |[x, y]| egui::vec2(x, y)),
+            height: self.controls.input_height.unwrap_or(d.height),
+        }
+        .clamped()
     }
 
     /// `base` (egui's visuals for this skin's `base`) with the skin's
@@ -359,6 +405,7 @@ impl Skin {
             v.window_shadow = Shadow::NONE;
             v.popup_shadow = Shadow::NONE;
         }
+        steady_visuals(&mut v);
         v
     }
 
@@ -722,6 +769,29 @@ mod tests {
     }
 
     #[test]
+    fn buttons_are_a_title_bar_buttons_size_unless_the_skin_says_otherwise() {
+        let size = |skin: &Skin| {
+            let ctx = egui::Context::default();
+            skin.apply(&ctx);
+            ctx.style_of(ctx.theme()).spacing.button_padding
+        };
+        let plain = Skin::parse("format = 1\nname = \"Plain\"\nbase = \"dark\"").unwrap();
+        assert_eq!(size(&plain), crate::dialog::BUTTON_PADDING);
+        let own =
+            Skin::parse("format = 1\nname = \"Own\"\nbase = \"dark\"\n[controls]\nbutton_padding = [4, 1]")
+                .unwrap();
+        assert_eq!(size(&own), egui::vec2(4.0, 1.0));
+        let wild = Skin::parse(
+            "format = 1\nname = \"Wild\"\nbase = \"dark\"\n[controls]\nbutton_padding = [90, -3]",
+        )
+        .unwrap();
+        assert_eq!(size(&wild), egui::vec2(24.0, 0.0), "held to the limits");
+        // The default skin, which follows the desktop, too.
+        let system = Skin::parse("format = 1\nname = \"System\"").unwrap();
+        assert_eq!(size(&system), crate::dialog::BUTTON_PADDING);
+    }
+
+    #[test]
     fn the_old_format_is_rejected_with_directions() {
         let err = Skin::parse("name = \"Old\"\n[player]\ntime = \"#FFFFFF\"").unwrap_err();
         assert!(
@@ -742,7 +812,12 @@ mod tests {
 /// The tree and the title bar use it; apps call it for lists of
 /// `selectable_label`s of their own, such as a sidebar.
 pub fn steady_controls(ui: &mut egui::Ui) {
-    let w = &mut ui.visuals_mut().widgets;
+    steady_visuals(ui.visuals_mut());
+}
+
+/// [`steady_controls`] on visuals; [`Skin::apply`] does it for every control.
+pub fn steady_visuals(v: &mut egui::Visuals) {
+    let w = &mut v.widgets;
     w.inactive.expansion = w.inactive.bg_stroke.width;
     for state in [&mut w.hovered, &mut w.active, &mut w.open] {
         state.expansion = 0.0;
@@ -759,7 +834,10 @@ mod steady_tests {
         let size = std::cell::Cell::new((egui::Vec2::ZERO, egui::Pos2::ZERO));
         let run = |pointer: Option<egui::Pos2>| {
             let mut input = egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(400.0, 300.0))),
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(400.0, 300.0),
+                )),
                 ..Default::default()
             };
             input.events.push(match pointer {
@@ -767,13 +845,19 @@ mod steady_tests {
                 None => egui::Event::PointerGone,
             });
             let out = ctx.run_ui(input, |ui| {
-                ui.visuals_mut().widgets.inactive.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
-                ui.visuals_mut().widgets.hovered.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
-                ui.visuals_mut().widgets.active.bg_stroke = egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.inactive.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.hovered.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
+                ui.visuals_mut().widgets.active.bg_stroke =
+                    egui::Stroke::new(width, egui::Color32::RED);
                 if steady {
                     steady_controls(ui);
                 }
-                size.set((ui.selectable_label(false, "Folder").rect.size(), egui::Pos2::ZERO));
+                size.set((
+                    ui.selectable_label(false, "Folder").rect.size(),
+                    egui::Pos2::ZERO,
+                ));
             });
             // Where the text was drawn.
             let text = out
@@ -799,7 +883,10 @@ mod steady_tests {
     #[test]
     fn hovering_a_stroked_control_does_not_resize_it() {
         let (idle, hovered) = sizes(1.0, false);
-        assert_ne!(idle, hovered, "egui alone resizes; the test would prove nothing");
+        assert_ne!(
+            idle, hovered,
+            "egui alone resizes; the test would prove nothing"
+        );
         for width in [1.0, 2.0] {
             let (idle, hovered) = sizes(width, true);
             assert_eq!(idle, hovered, "border {width}");

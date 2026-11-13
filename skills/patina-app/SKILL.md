@@ -89,6 +89,10 @@ Also call `patina::appearance::watch(&cc.egui_ctx)` once at start-up, and comput
   app's own menus, then Skins. No hamburger and no icon toolbar. Right, next to the window
   buttons, are the actions that make the app's main output (Photograph's Render). An app with no
   output leaves it empty. Settings and status go in a menu, a sidebar or a status bar.
+- **Dialog buttons are the title bar's size.** A row of buttons in a dialog, panel or popup:
+  `patina::dialog::buttons(ui)` first inside a right-to-left layout, the button Enter presses
+  `patina::dialog::primary(ui, "Save")` (rightmost), then the others. Not egui's 18 px buttons
+  (ADR-0032).
 - **Stock egui first.** Use the default `Style`, `Visuals` and fonts. Paint your own only where
   egui has no widget, and take colours from the active `Visuals`, so skins reach it.
 - **Skinnable all the way down.** Every colour the app paints comes from the skin or the

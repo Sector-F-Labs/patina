@@ -112,6 +112,10 @@ Implemented by `patina::frame`.
   that act. A menu's items are the exception, being as wide as the menu. Text that's only read
   can be any size. Where egui's default is smaller (its buttons are 18 px high), give the widget
   more room rather than shrink the target.
+- **A row of buttons in a dialog, panel or popup is the title bar's size**
+  ([ADR-0032](adr/0032-dialog-buttons-are-the-title-bar-s-size.md)): 10 px either side of the
+  text, 5 above and below, 24 px high, 8 apart. Call `patina::dialog::buttons(ui)` first inside the
+  row, right-align it, and make the button Enter presses `patina::dialog::primary`, rightmost.
 - **Menus are egui's own size** ([ADR-0023](adr/0023-menus-are-egui-s-own-size.md)): 18 px an
   item, 3 px apart, as Teleprinter's menu bar. Open a context menu with
   `patina::menu::context(&response, ...)`, and draw any other menu with `patina::menu::style`, so

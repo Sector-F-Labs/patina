@@ -2536,8 +2536,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "patina-emoji-font"
+version = "0.1.0"
+
+[[package]]
 name = "patina-ui"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "dirs",
  "eframe",
@@ -2545,12 +2549,14 @@ dependencies = [
  "egui_extras",
  "image",
  "libc",
+ "patina-emoji-font",
  "pulldown-cmark",
  "raw-window-handle",
  "serde",
  "serde_ignored",
  "syntect",
  "toml",
+ "ttf-parser",
  "two-face",
  "wayland-backend",
  "wayland-client",

@@ -11,6 +11,85 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.16 — 2026-11-13
+
+### Fixed
+
+- Hovering a button, selectable label or other control no longer moves it by its border's width:
+  `Skin::visuals` and `Skin::apply` now apply `skin::steady_visuals` (what `steady_controls` did
+  for the tree and the title bar) to every control. Nothing to change in an app.
+
+### Added
+
+- `patina::emoji` (cargo feature `emoji`): colour emoji from a bundled Noto Color Emoji (SIL OFL),
+  painted as images because egui draws no colour glyphs. `emoji::label(ui, text)` shows text with
+  its emoji in colour; `emoji::runs` splits text into plain and emoji runs, and `glyph`, `texture` and
+  `paint` are the pieces, for a widget that lays text out itself. It is Teleprinter's code (its
+  ADR-0013), shared. The font is not in `patina-ui`, because at 10 MB it takes the package over
+  crates.io's size limit: apps give it one with `emoji::install` or `install_file`
+  (Sector F's apps use the `patina-emoji-font` git crate in this repository; see Upgrading). The feature adds about 11 MB to the binary (ADR-0031).
+- `patina::dialog`: a row of buttons the size of the title bar's (ADR-0032). `dialog::buttons(ui)`
+  gives the buttons in a `ui` 10 by 5 px of padding, at least 24 px high, 8 px apart, as the bar's
+  (ADR-0028); `dialog::primary(ui, text)` is the button Enter presses, in the skin's accent.
+  The constants are `BUTTON_PADDING`, `BUTTON_HEIGHT` and `BUTTON_GAP`. The title bar's buttons are
+  unchanged.
+- `dialog::text_edit(ui, &mut text)`: a single-line input padded as a button is (10 by 5 px) and
+  at least 24 px high, since egui's `TextEdit` takes its 4 by 2 px margin from no style (ADR-0034).
+  The size is `dialog::input_size(ctx)`, which a skin sets with `[controls] input_padding` and
+  `input_height` (`Skin::apply` does it), and an app with `dialog::set_input_size`. `INPUT_PADDING`,
+  `INPUT_HEIGHT` and `InputSize` are the pieces. The folder tree's filter box uses it, so it is 24
+  px high now, up from 22, and the text starts 10 px in, up from 4.
+- The markdown `Editor` draws emoji in colour when both `markdown` and `emoji` are enabled: they
+  are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
+  painted over them.
+
+### Changed
+
+- Every button is a title bar button's size by default (ADR-0035): `Skin::apply` sets egui's
+  `spacing.button_padding` to 10 by 5 px, or to the skin's `[controls] button_padding` (`[4, 1]` is
+  egui's old size), so plain buttons, drop-downs, drag values and selectable labels are about 24 px
+  high, as dialog buttons and inputs are, with no change in the app. `Skin::spacing()` is the
+  value. Tabs, menus and the title bar, which size themselves, don't change. The folder tree's rows are
+  `tree::ROW` (24 px) apart whatever the buttons' size, as a list's are.
+- Markdown tables look and lay out like HTML's (ADR-0033): joined cells with borders, text that
+  wraps, as wide as the content wants up to the text's width, and images in cells (`![alt](src)`,
+  `<img>`, inside a link too) shown. `markdown::embeds::table` takes the document's folder before
+  the id; the `Editor` does this itself.
+
+### Upgrading
+
+- **Buttons are bigger by default: look at toolbars and dense panels.** Plain egui buttons are
+  about 24 px high now, not 18, and 12 px wider; a row of them takes more room. To keep a place as
+  it was, set `ui.spacing_mut().button_padding = egui::vec2(4.0, 1.0)` in a scope there, or have
+  the skin say `[controls] button_padding = [4, 1]`. `dialog::buttons` is still how a row gets
+  the 8 px gap and the least height. **An app's own list or tree made of `selectable_label`s grows with
+  the buttons**: set its own `button_padding` in the list's scope, as `tree::Tree` does.
+
+- **Apps with dialogs, or any row of buttons outside the title bar: call `patina::dialog::buttons(ui)`
+  first inside the row's layout, and make the button Enter presses `patina::dialog::primary`.**
+  egui's buttons are 18 px high and look small next to the bar's. Right-align the row, the primary
+  button rightmost (`Layout::right_to_left`, adding it first). An app with its own copy of the
+  bar's button spacing can delete it. Nothing changes until you call it.
+- **Apps that show text with emoji in it: enable the `emoji` feature, install a font and show that
+  text with `patina::emoji::label`.** The font isn't in `patina-ui` (10 MB is over crates.io's size
+  limit) and Patina doesn't look for one: once at start-up, give it the bytes of a Noto Color
+  Emoji in its CBDT build (PNG images), or a path:
+
+  ```rust
+  patina::emoji::install(font_bytes);   // &'static [u8]
+  patina::emoji::install_file(&path);   // a file you ship or the user picks
+  ```
+
+  Each says `false` if the font isn't usable; emoji then stay as egui draws them. Sector F's apps
+  use our copy, a git dependency (crates.io refuses those, so not for a published app):
+
+  ```toml
+  patina-emoji-font = { git = "https://github.com/Sector-F-Labs/patina", branch = "develop" }
+  ```
+
+  and `patina::emoji::install(patina_emoji_font::FONT);`. egui's own labels still draw emoji as
+  monochrome shapes. Nothing else changes.
+
 ## 0.1.15 — 2026-11-06
 
 ### Added

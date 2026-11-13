@@ -17,7 +17,11 @@ pub struct SvgFiles {
 }
 
 fn ready(bytes: Arc<[u8]>) -> BytesLoadResult {
-    Ok(BytesPoll::Ready { size: None, bytes: Bytes::Shared(bytes), mime: Some("image/svg+xml".into()) })
+    Ok(BytesPoll::Ready {
+        size: None,
+        bytes: Bytes::Shared(bytes),
+        mime: Some("image/svg+xml".into()),
+    })
 }
 
 impl BytesLoader for SvgFiles {
@@ -36,12 +40,18 @@ impl BytesLoader for SvgFiles {
         }
         let text = std::fs::read_to_string(path).map_err(|e| LoadError::Loading(e.to_string()))?;
         let bytes: Arc<[u8]> = resolve(&text, dark).into_bytes().into();
-        self.cache.lock().expect("svg cache").insert(key, bytes.clone());
+        self.cache
+            .lock()
+            .expect("svg cache")
+            .insert(key, bytes.clone());
         ready(bytes)
     }
 
     fn forget(&self, uri: &str) {
-        self.cache.lock().expect("svg cache").retain(|(u, _), _| u != uri);
+        self.cache
+            .lock()
+            .expect("svg cache")
+            .retain(|(u, _), _| u != uri);
     }
 
     fn forget_all(&self) {
@@ -49,7 +59,12 @@ impl BytesLoader for SvgFiles {
     }
 
     fn byte_size(&self) -> usize {
-        self.cache.lock().expect("svg cache").values().map(|b| b.len()).sum()
+        self.cache
+            .lock()
+            .expect("svg cache")
+            .values()
+            .map(|b| b.len())
+            .sum()
     }
 }
 
@@ -59,8 +74,14 @@ pub fn resolve(svg: &str, dark: bool) -> String {
     // The rasteriser maps `sans-serif` and `monospace` to Arial and Courier
     // New, which a Linux machine often lacks: name families it may have.
     let svg = svg
-        .replace(",sans-serif", ",Noto Sans,DejaVu Sans,Liberation Sans,Ubuntu,Cantarell,sans-serif")
-        .replace(",monospace", ",DejaVu Sans Mono,Liberation Mono,Noto Sans Mono,Ubuntu Mono,monospace");
+        .replace(
+            ",sans-serif",
+            ",Noto Sans,DejaVu Sans,Liberation Sans,Ubuntu,Cantarell,sans-serif",
+        )
+        .replace(
+            ",monospace",
+            ",DejaVu Sans Mono,Liberation Mono,Noto Sans Mono,Ubuntu Mono,monospace",
+        );
     let svg = svg.as_str();
     if !svg.contains("var(") {
         return svg.to_string();
@@ -77,7 +98,9 @@ pub fn resolve(svg: &str, dark: bool) -> String {
             tail.contains("dark") && tail.matches('{').count() == 1
         });
         let body_start = at + ":root{".len();
-        let Some(len) = svg[body_start..].find('}') else { break };
+        let Some(len) = svg[body_start..].find('}') else {
+            break;
+        };
         if !in_dark || dark {
             for decl in svg[body_start..body_start + len].split(';') {
                 if let Some((name, value)) = decl.split_once(':')
@@ -94,10 +117,16 @@ pub fn resolve(svg: &str, dark: bool) -> String {
     while let Some(at) = rest.find("var(") {
         out.push_str(&rest[..at]);
         let inner_start = at + 4;
-        let Some(close) = rest[inner_start..].find(')') else { break };
+        let Some(close) = rest[inner_start..].find(')') else {
+            break;
+        };
         let inner = &rest[inner_start..inner_start + close];
         let (name, fallback) = inner.split_once(',').unwrap_or((inner, ""));
-        out.push_str(vars.get(name.trim()).map(String::as_str).unwrap_or(fallback.trim()));
+        out.push_str(
+            vars.get(name.trim())
+                .map(String::as_str)
+                .unwrap_or(fallback.trim()),
+        );
         rest = &rest[inner_start + close + 1..];
     }
     out.push_str(rest);

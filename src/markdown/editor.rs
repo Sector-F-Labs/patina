@@ -1288,7 +1288,7 @@ impl Editor {
                 let preedit = (focused && i == self.cursor.para)
                     .then(|| self.preedit.clone())
                     .flatten();
-                let job = layout_job(
+                let (job, emoji) = layout_job(
                     line,
                     &look,
                     &visuals,
@@ -1336,6 +1336,7 @@ impl Editor {
                 }
                 ui.painter()
                     .galley(origin, galley.clone(), look.color(&visuals));
+                paint_emoji(ui.painter(), &galley, origin, &emoji);
                 placed[i] = Some(Placed {
                     galley,
                     origin,
@@ -1347,15 +1348,22 @@ impl Editor {
                 ui.add_space(6.0);
                 let original = self.paras[i].clone();
                 let response = match &mut self.paras[i] {
-                    Para::Table(table) => {
-                        embeds::table(ui, table, self.id.with(("table", i)), !self.read_only)
-                    }
+                    Para::Table(table) => embeds::table(
+                        ui,
+                        table,
+                        self.dir.as_deref(),
+                        self.id.with(("table", i)),
+                        !self.read_only,
+                    ),
                     Para::Code { lang, code } => {
                         embeds::code(ui, lang, code, code_id(self.id, i), !self.read_only)
                     }
                     Para::Image(image) => {
-                        let (dir, id, editable) =
-                            (self.dir.as_deref(), self.id.with(("image", i)), !self.read_only);
+                        let (dir, id, editable) = (
+                            self.dir.as_deref(),
+                            self.id.with(("image", i)),
+                            !self.read_only,
+                        );
                         if self.image_room > 0.0 {
                             let free = ui.available_rect_before_wrap();
                             let wide = Rect::from_min_max(
@@ -1365,9 +1373,8 @@ impl Editor {
                             // A child that isn't allocated in this ui, so the page's
                             // width doesn't grow to hold it: only its height is.
                             let layout = egui::Layout::top_down(egui::Align::Center);
-                            let mut child = ui.new_child(
-                                egui::UiBuilder::new().max_rect(wide).layout(layout),
-                            );
+                            let mut child =
+                                ui.new_child(egui::UiBuilder::new().max_rect(wide).layout(layout));
                             let out = embeds::image(&mut child, image, dir, id, editable);
                             let height = child.min_rect().height();
                             ui.allocate_space(vec2(free.width(), height));
@@ -1837,6 +1844,69 @@ fn format(styles: &[Inline], look: &Look, v: &egui::Visuals) -> TextFormat {
     f
 }
 
+/// An emoji in a laid-out paragraph: where it starts (in characters), how
+/// many characters it takes, and its colour glyph.
+#[cfg(feature = "emoji")]
+type Found = (usize, usize, crate::emoji::Glyph);
+#[cfg(not(feature = "emoji"))]
+type Found = (usize, usize, std::convert::Infallible);
+
+/// Adds `text` to `job`. With the `emoji` feature its emoji are laid out
+/// invisibly, so they take room and the cursor and selection find them, and
+/// noted in `found` for [`paint_emoji`] to draw over (egui draws no colour).
+fn append(job: &mut LayoutJob, text: &str, f: TextFormat, found: &mut Vec<Found>) {
+    #[cfg(feature = "emoji")]
+    {
+        use crate::emoji::{Run, runs};
+        let parts = runs(text);
+        if parts.iter().any(|r| matches!(r, Run::Emoji(..))) {
+            for run in parts {
+                match run {
+                    Run::Text(t) => job.append(t, 0.0, f.clone()),
+                    Run::Emoji(t, glyph) => {
+                        let at = job.text.chars().count();
+                        found.push((at, t.chars().count(), glyph));
+                        let mut hidden = f.clone();
+                        hidden.color = Color32::TRANSPARENT;
+                        job.append(t, 0.0, hidden);
+                    }
+                }
+            }
+            return;
+        }
+    }
+    let _ = &found;
+    job.append(text, 0.0, f);
+}
+
+/// Draws the emoji `append` found, in colour, over their invisible places.
+fn paint_emoji(painter: &egui::Painter, galley: &Galley, origin: Pos2, found: &[Found]) {
+    #[cfg(feature = "emoji")]
+    for &(start, len, glyph) in found {
+        let mut row_start = 0;
+        for row in &galley.rows {
+            let count = row.char_count_including_newline().0;
+            let row_end = row_start + row.row.char_count_excluding_newline().0;
+            if start >= row_start && start < row_end.max(row_start + 1) {
+                let end = (start + len).min(row_end);
+                let x0 = row.pos.x + row.row.x_offset(egui::text::CharIndex(start - row_start));
+                let x1 = row.pos.x + row.row.x_offset(egui::text::CharIndex(end - row_start));
+                let band = row.rect();
+                let w = (x1 - x0).max(band.height());
+                let rect = Rect::from_min_size(
+                    egui::pos2(origin.x + x0, origin.y + band.min.y),
+                    vec2(w, band.height()),
+                );
+                crate::emoji::paint(painter, glyph, rect);
+                break;
+            }
+            row_start += count;
+        }
+    }
+    #[cfg(not(feature = "emoji"))]
+    let _ = (painter, galley, origin, found);
+}
+
 /// Lays out a paragraph's spans, with an IME composition shown underlined
 /// at its column.
 fn layout_job(
@@ -1845,8 +1915,9 @@ fn layout_job(
     v: &egui::Visuals,
     width: f32,
     preedit: Option<(usize, String)>,
-) -> LayoutJob {
+) -> (LayoutJob, Vec<Found>) {
     let mut job = LayoutJob::default();
+    let mut found = Vec::new();
     job.wrap.max_width = width.max(20.0);
     let mut spans: Vec<Span> = line.spans.clone();
     let mut preedit_at = None;
@@ -1866,7 +1937,12 @@ fn layout_job(
             f.underline = Stroke::new(1.0, f.color);
             job.append(text, 0.0, f);
         }
-        job.append(&span.text, 0.0, format(&span.styles, look, v));
+        append(
+            &mut job,
+            &span.text,
+            format(&span.styles, look, v),
+            &mut found,
+        );
     }
     if let Some((at, text)) = &preedit_at
         && *at == spans.len()
@@ -1875,7 +1951,7 @@ fn layout_job(
         f.underline = Stroke::new(1.0, f.color);
         job.append(text, 0.0, f);
     }
-    job
+    (job, found)
 }
 
 /// Highlights characters `start..end` of a galley, plus a sliver past the
@@ -1948,6 +2024,29 @@ mod tests {
                 editor.show(ui);
             });
         });
+    }
+
+    #[cfg(feature = "emoji")]
+    #[test]
+    fn emoji_are_laid_out_invisibly_and_found() {
+        let line = Line {
+            block: Block::Paragraph,
+            spans: vec![Span {
+                text: "hi 😀 there".into(),
+                styles: vec![],
+            }],
+        };
+        let look = Look::of(&line.block);
+        let (job, found) = layout_job(&line, &look, &egui::Visuals::dark(), 400.0, None);
+        assert_eq!(job.text, "hi 😀 there");
+        assert_eq!(found.len(), 1);
+        assert_eq!((found[0].0, found[0].1), (3, 1));
+        let hidden = job
+            .sections
+            .iter()
+            .find(|s| job.text[s.byte_range.start.0..s.byte_range.end.0].contains('😀'))
+            .unwrap();
+        assert_eq!(hidden.format.color, Color32::TRANSPARENT);
     }
 
     fn key(key: Key, modifiers: Modifiers) -> Event {

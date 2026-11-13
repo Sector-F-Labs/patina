@@ -7,7 +7,7 @@ use std::path::Path;
 
 use egui::{Id, RichText};
 
-use super::model::{Align, Image, Table};
+use super::model::{Align, CellPart, Image, Table, cell_parts};
 
 /// Images are shown at their own size, scaled down to fit the column and,
 /// for tall ones, this height.
@@ -41,55 +41,117 @@ const LANGUAGES: &[(&str, &str)] = &[
     ("yaml", "YAML"),
 ];
 
-const CELL_WIDTH: f32 = 140.0;
+/// Space inside a cell, around its content.
+const CELL_PADDING: egui::Vec2 = egui::vec2(8.0, 5.0);
+/// A column is never narrower than this, so an empty cell can still be clicked.
+const MIN_COLUMN: f32 = 48.0;
+/// What an image that isn't loaded yet takes.
+const PENDING_IMAGE: egui::Vec2 = egui::vec2(64.0, 64.0);
 
-/// A table; with `editable` off, its cells can only be selected and copied.
-pub fn table(ui: &mut egui::Ui, table: &mut Table, id: Id, editable: bool) -> EmbedResponse {
+/// A table, laid out as HTML lays out an auto-width one: it is as wide as its
+/// content wants, up to the width available (the text's); beyond that, text wraps
+/// and images shrink, each column getting room for what it holds. Cells are joined,
+/// with borders between them. A cell holds its inline markdown, and the images in it
+/// (`![alt](src)`, `<img>`) are shown; with `editable` off, its text can only be
+/// selected and copied.
+pub fn table(
+    ui: &mut egui::Ui,
+    table: &mut Table,
+    dir: Option<&Path>,
+    id: Id,
+    editable: bool,
+) -> EmbedResponse {
     let mut out = EmbedResponse::default();
     let mut command = None;
-    egui::Frame::group(ui.style()).show(ui, |ui| {
-        egui::Grid::new(id).spacing([4.0, 4.0]).show(ui, |ui| {
-            for r in 0..table.rows.len() {
-                for c in 0..table.columns() {
-                    let header = r == 0;
-                    let align = match table.align[c] {
-                        Align::Center => egui::Align::Center,
-                        Align::Right => egui::Align::Max,
-                        _ => egui::Align::Min,
-                    };
-                    // A &str shows the text, selectable, and edits nothing.
-                    let mut shown = table.rows[r][c].as_str();
-                    let text: &mut dyn egui::TextBuffer = if editable {
-                        &mut table.rows[r][c]
-                    } else {
-                        &mut shown
-                    };
-                    let mut edit = egui::TextEdit::singleline(text)
-                        .id(id.with((r, c)))
-                        .desired_width(CELL_WIDTH)
-                        .horizontal_align(align);
-                    if header {
-                        edit = edit
-                            .text_color(ui.visuals().strong_text_color())
-                            .hint_text("Heading");
-                    }
-                    let resp = ui.add_sized([CELL_WIDTH, ui.spacing().interact_size.y], edit);
-                    out.changed |= resp.changed();
-                    if editable {
-                        resp.context_menu(|ui| {
-                            if let Some(cmd) = table_menu(ui, r, c, table) {
-                                command = Some(cmd);
-                                ui.close();
-                            }
-                        });
-                    }
-                }
-                ui.end_row();
+    let columns = table.columns();
+    if table.rows.is_empty() || columns == 0 {
+        return out;
+    }
+    let available = ui.available_width();
+    let cells: Vec<Vec<Vec<CellPart>>> = table
+        .rows
+        .iter()
+        .map(|row| row.iter().map(|cell| cell_parts(cell)).collect())
+        .collect();
+    let widths = column_widths(ui, &table.rows, &cells, dir, available);
+    let width: f32 = widths.iter().sum();
+
+    let visuals = ui.visuals().clone();
+    let stroke = visuals.widgets.noninteractive.bg_stroke;
+    // Fills and borders go under the cells' content: their place is kept now.
+    let backdrop = ui.painter().add(egui::Shape::Noop);
+    let mut shapes = Vec::new();
+    let origin = ui.available_rect_before_wrap().min;
+    let mut y = origin.y;
+    for (r, row_cells) in cells.iter().enumerate() {
+        let mut row_height: f32 = 0.0;
+        let mut x = origin.x;
+        let mut rects = Vec::new();
+        for c in 0..columns {
+            let align = match table.align[c] {
+                Align::Center => egui::Align::Center,
+                Align::Right => egui::Align::Max,
+                _ => egui::Align::Min,
+            };
+            let inner = egui::Rect::from_min_size(
+                egui::pos2(x, y) + CELL_PADDING,
+                egui::vec2(widths[c] - 2.0 * CELL_PADDING.x, 1.0e6),
+            );
+            let mut cell_ui = ui.new_child(
+                egui::UiBuilder::new()
+                    .id_salt(id.with(("cell", r, c)))
+                    .max_rect(inner)
+                    .layout(egui::Layout::top_down(align)),
+            );
+            let cell = CellView {
+                id: id.with((r, c)),
+                header: r == 0,
+                align,
+                editable,
+                dir,
+            };
+            let changed_by = show_cell(&mut cell_ui, &row_cells[c], &mut table.rows[r][c], &cell);
+            out.changed |= changed_by.changed;
+            if let Some(cmd) = changed_by.menu_command(r, c, table) {
+                command = Some(cmd);
             }
-        });
-        if !editable {
-            return;
+            row_height = row_height.max(cell_ui.min_rect().height() + 2.0 * CELL_PADDING.y);
+            rects.push(x);
+            x += widths[c];
         }
+        let band =
+            egui::Rect::from_min_size(egui::pos2(origin.x, y), egui::vec2(width, row_height));
+        if r == 0 {
+            shapes.push(egui::Shape::rect_filled(band, 0.0, visuals.faint_bg_color));
+        }
+        // The line under each row, and the ones between its cells.
+        shapes.push(egui::Shape::hline(band.x_range(), band.bottom(), stroke));
+        for &left in rects.iter().skip(1) {
+            shapes.push(egui::Shape::vline(left, band.y_range(), stroke));
+        }
+        y += row_height;
+    }
+    let table_rect = egui::Rect::from_min_max(origin, egui::pos2(origin.x + width, y));
+    shapes.push(egui::Shape::hline(
+        table_rect.x_range(),
+        table_rect.top(),
+        stroke,
+    ));
+    shapes.push(egui::Shape::vline(
+        table_rect.left(),
+        table_rect.y_range(),
+        stroke,
+    ));
+    shapes.push(egui::Shape::vline(
+        table_rect.right(),
+        table_rect.y_range(),
+        stroke,
+    ));
+    ui.painter().set(backdrop, egui::Shape::Vec(shapes));
+    ui.allocate_rect(table_rect, egui::Sense::hover());
+
+    if editable {
+        ui.add_space(2.0);
         ui.horizontal(|ui| {
             if ui.small_button("+ Row").clicked() {
                 command = Some(TableCommand::InsertRow(table.rows.len()));
@@ -99,7 +161,7 @@ pub fn table(ui: &mut egui::Ui, table: &mut Table, id: Id, editable: bool) -> Em
             }
             ui.label(RichText::new("Right-click a cell for more").weak().small());
         });
-    });
+    }
     if let Some(cmd) = command {
         if cmd == TableCommand::DeleteTable {
             out.delete = true;
@@ -109,6 +171,248 @@ pub fn table(ui: &mut egui::Ui, table: &mut Table, id: Id, editable: bool) -> Em
         }
     }
     out
+}
+
+/// What a cell is shown with.
+struct CellView<'a> {
+    id: Id,
+    header: bool,
+    align: egui::Align,
+    editable: bool,
+    dir: Option<&'a Path>,
+}
+
+/// What came of showing a cell.
+#[derive(Default)]
+struct CellResult {
+    changed: bool,
+    /// The cell's response, for its context menu.
+    response: Option<egui::Response>,
+    command: Option<TableCommand>,
+}
+
+impl CellResult {
+    fn menu_command(mut self, r: usize, c: usize, table: &Table) -> Option<TableCommand> {
+        if let Some(response) = self.response.take() {
+            response.context_menu(|ui| {
+                if let Some(cmd) = table_menu(ui, r, c, table) {
+                    self.command = Some(cmd);
+                    ui.close();
+                }
+            });
+        }
+        self.command
+    }
+}
+
+/// The text of a cell as it's measured and shown, `<br>` as a break.
+fn cell_text_font(ui: &egui::Ui) -> egui::FontId {
+    egui::TextStyle::Body.resolve(ui.style())
+}
+
+/// How wide a cell's content wants to be, `(least, most)`: its longest word, and its text
+/// on one line. An image wants its own width either way, so it's the text that wraps.
+fn content_width(
+    ui: &egui::Ui,
+    parts: &[CellPart],
+    source: &str,
+    dir: Option<&Path>,
+) -> (f32, f32) {
+    let font = cell_text_font(ui);
+    let color = ui.visuals().text_color();
+    let measure = |text: &str| {
+        ui.painter()
+            .layout_no_wrap(text.to_string(), font.clone(), color)
+            .size()
+            .x
+    };
+    let text_width = |text: &str| -> (f32, f32) {
+        let most = text.lines().map(&measure).fold(0.0, f32::max);
+        let least = text.split_whitespace().map(&measure).fold(0.0, f32::max);
+        (least, most)
+    };
+    if !parts.iter().any(|p| matches!(p, CellPart::Image(_))) {
+        // What shows is the source itself.
+        return text_width(source);
+    }
+    parts.iter().fold((0.0, 0.0), |(least, most), part| {
+        let (l, m) = match part {
+            CellPart::Text(text) => text_width(text),
+            CellPart::Image(image) => {
+                let natural =
+                    natural_size(ui.ctx(), &image_uri(&image.src, dir)).unwrap_or(PENDING_IMAGE);
+                (natural.x, natural.x)
+            }
+        };
+        (f32::max(least, l), f32::max(most, m))
+    })
+}
+
+/// Each column's width: as wide as its widest cell wants if the table fits in
+/// `available` that way; else every column gets its least (images their own width,
+/// text its longest word), and what's left is shared by how much more each wants.
+fn column_widths(
+    ui: &egui::Ui,
+    sources: &[Vec<String>],
+    cells: &[Vec<Vec<CellPart>>],
+    dir: Option<&Path>,
+    available: f32,
+) -> Vec<f32> {
+    let columns = cells[0].len();
+    let pad = 2.0 * CELL_PADDING.x;
+    let mut least = vec![MIN_COLUMN; columns];
+    let mut most = vec![MIN_COLUMN; columns];
+    for (row, sources) in cells.iter().zip(sources) {
+        for (c, parts) in row.iter().enumerate() {
+            let (l, m) = content_width(ui, parts, &sources[c], dir);
+            least[c] = least[c].max(l + pad);
+            most[c] = most[c].max(m + pad);
+        }
+    }
+    distribute(&least, &most, available)
+}
+
+/// The widths for columns that want `least..=most`, in `available`.
+fn distribute(least: &[f32], most: &[f32], available: f32) -> Vec<f32> {
+    let (min_sum, max_sum): (f32, f32) = (least.iter().sum(), most.iter().sum());
+    if max_sum <= available {
+        return most.to_vec();
+    }
+    if min_sum >= available {
+        // Not even the least fits: all shrink together, down to a floor.
+        let scale = available / min_sum;
+        return least.iter().map(|l| (l * scale).max(24.0)).collect();
+    }
+    let room = available - min_sum;
+    let want = max_sum - min_sum;
+    least
+        .iter()
+        .zip(most)
+        .map(|(l, m)| l + room * (m - l) / want)
+        .collect()
+}
+
+/// An image's own size, once egui has loaded it.
+fn natural_size(ctx: &egui::Context, uri: &str) -> Option<egui::Vec2> {
+    refresh_if_changed(ctx, uri);
+    match ctx.try_load_texture(
+        uri,
+        egui::TextureOptions::default(),
+        egui::load::SizeHint::Scale(1.0.into()),
+    ) {
+        Ok(poll) => poll.size(),
+        Err(_) => None,
+    }
+}
+
+/// One cell: its text, editable as the markdown it is, or, when it holds
+/// images and isn't being edited, those and its text as they look.
+fn show_cell(
+    ui: &mut egui::Ui,
+    parts: &[CellPart],
+    source: &mut String,
+    cell: &CellView,
+) -> CellResult {
+    let mut result = CellResult::default();
+    let width = ui.available_width();
+    let has_images = parts.iter().any(|p| matches!(p, CellPart::Image(_)));
+    let editing_key = cell.id.with("editing");
+    let mut editing: bool = ui.data(|d| d.get_temp(editing_key)).unwrap_or(false);
+    if has_images && !editing {
+        show_parts(ui, parts, cell, width);
+        let area = ui.min_rect().expand2(CELL_PADDING);
+        let click = ui.interact(area, cell.id.with("area"), egui::Sense::click());
+        if cell.editable && click.clicked() {
+            ui.data_mut(|d| {
+                d.insert_temp(editing_key, true);
+                d.insert_temp(cell.id.with("focus"), true);
+            });
+            ui.ctx().request_repaint();
+        }
+        result.response = Some(click);
+        return result;
+    }
+    // A &str shows the text, selectable, and edits nothing.
+    let mut shown = source.as_str();
+    let text: &mut dyn egui::TextBuffer = if cell.editable { source } else { &mut shown };
+    let mut edit = egui::TextEdit::multiline(text)
+        .id(cell.id)
+        .frame(egui::Frame::NONE)
+        .margin(egui::Margin::ZERO)
+        .desired_rows(1)
+        .desired_width(width)
+        .return_key(None)
+        .horizontal_align(cell.align);
+    if cell.header {
+        edit = edit
+            .text_color(ui.visuals().strong_text_color())
+            .hint_text("Heading");
+    }
+    let response = ui.add(edit);
+    result.changed = response.changed();
+    if has_images && cell.editable {
+        let focus_wanted: bool = ui
+            .data(|d| d.get_temp(cell.id.with("focus")))
+            .unwrap_or(false);
+        if focus_wanted {
+            response.request_focus();
+            ui.data_mut(|d| d.insert_temp(cell.id.with("focus"), false));
+        } else if !response.has_focus() {
+            editing = false;
+            ui.data_mut(|d| d.insert_temp(editing_key, editing));
+        }
+    }
+    if cell.editable {
+        result.response = Some(response);
+    }
+    result
+}
+
+/// A cell's text and images, one under another.
+fn show_parts(ui: &mut egui::Ui, parts: &[CellPart], cell: &CellView, width: f32) {
+    for part in parts {
+        match part {
+            CellPart::Text(text) => {
+                let mut rich = RichText::new(text);
+                if cell.header {
+                    rich = rich.color(ui.visuals().strong_text_color());
+                }
+                ui.add(egui::Label::new(rich).wrap());
+            }
+            CellPart::Image(image) => {
+                let uri = image_uri(&image.src, cell.dir);
+                let missing = uri
+                    .strip_prefix("file://")
+                    .is_some_and(|path| !Path::new(path).exists());
+                if missing {
+                    let note = if image.alt.is_empty() {
+                        &image.src
+                    } else {
+                        &image.alt
+                    };
+                    ui.add(egui::Label::new(RichText::new(format!("🖼 {note}")).weak()).wrap());
+                    continue;
+                }
+                let natural = natural_size(ui.ctx(), &uri).unwrap_or(PENDING_IMAGE);
+                let scale = (width / natural.x)
+                    .min(IMAGE_MAX_HEIGHT / natural.y)
+                    .min(1.0);
+                let response = ui.add(
+                    egui::Image::new(uri.clone())
+                        .fit_to_exact_size(natural * scale)
+                        .corner_radius(2),
+                );
+                let hint = if image.title.is_empty() {
+                    image.alt.clone()
+                } else {
+                    image.title.clone()
+                };
+                if !hint.is_empty() {
+                    response.on_hover_text(hint);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -500,13 +804,18 @@ const IMAGE_POLL: f64 = 0.5;
 /// every `IMAGE_POLL` seconds, and asks for a frame then so a change is seen
 /// without any input.
 fn refresh_if_changed(ctx: &egui::Context, uri: &str) {
-    let Some(path) = uri.strip_prefix("file://") else { return };
+    let Some(path) = uri.strip_prefix("file://") else {
+        return;
+    };
     let now = ctx.input(|i| i.time);
     let key = Id::new(("image-seen", uri));
-    let (checked, seen): (f64, Option<std::time::SystemTime>) =
-        ctx.data(|d| d.get_temp(key)).unwrap_or((f64::NEG_INFINITY, None));
+    let (checked, seen): (f64, Option<std::time::SystemTime>) = ctx
+        .data(|d| d.get_temp(key))
+        .unwrap_or((f64::NEG_INFINITY, None));
     if now - checked < IMAGE_POLL {
-        ctx.request_repaint_after(std::time::Duration::from_secs_f64(IMAGE_POLL - (now - checked)));
+        ctx.request_repaint_after(std::time::Duration::from_secs_f64(
+            IMAGE_POLL - (now - checked),
+        ));
         return;
     }
     let modified = std::fs::metadata(path).and_then(|m| m.modified()).ok();
@@ -549,6 +858,29 @@ mod tests {
         // The header row stays first.
         apply(&mut t, TableCommand::InsertRow(0));
         assert_eq!(t.rows.len(), 3);
+    }
+
+    #[test]
+    fn a_table_that_fits_takes_only_what_it_wants() {
+        // Wants 100 and 60 in 500: nothing is stretched.
+        assert_eq!(
+            distribute(&[40.0, 30.0], &[100.0, 60.0], 500.0),
+            [100.0, 60.0]
+        );
+    }
+
+    #[test]
+    fn a_table_that_doesn_t_fit_fills_the_width_and_wraps_the_text() {
+        // An image column that won't shrink (128) beside text that will (60..600).
+        let widths = distribute(&[128.0, 60.0], &[128.0, 600.0], 400.0);
+        assert_eq!(widths[0], 128.0, "the image keeps its width");
+        assert!(
+            (widths.iter().sum::<f32>() - 400.0).abs() < 0.01,
+            "the text takes the rest"
+        );
+        // Even the least doesn't fit: everything shrinks, to a floor.
+        let tight = distribute(&[300.0, 300.0], &[300.0, 300.0], 300.0);
+        assert!(tight.iter().all(|w| *w == 150.0));
     }
 
     #[test]
