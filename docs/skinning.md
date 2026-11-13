@@ -98,6 +98,7 @@ example.
 | `border` | Control outlines (defaults to `colors.border`) |
 | `input_padding` | Padding inside text inputs, `[across, down]` in px, 0 to 24 (default `[10, 5]`, a button's) |
 | `input_height` | Least height of a text input in px, 16 to 64 (default 24, a button's) |
+| `button_padding` | Padding inside buttons, drop-downs, drag values and selectable labels, `[across, down]` in px, 0 to 24 (default `[10, 5]`, the title bar's; `[4, 1]` is egui's) |
 
 egui draws buttons with one fill and slider/checkbox tracks with another. Tracks at rest use
 `colors.surface`, so they stay visible when `controls.background` matches `colors.background`.

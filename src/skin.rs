@@ -120,6 +120,10 @@ pub struct Controls {
     pub input_padding: Option<[f32; 2]>,
     /// Least height of a text input in px; 24, a button's, when unset.
     pub input_height: Option<f32>,
+    /// Padding inside buttons and the controls drawn like them (drop-downs,
+    /// drag values, selectable labels), `[across, down]` in px; 10 by 5, the title
+    /// bar's, when unset. `[4, 1]` is egui's.
+    pub button_padding: Option<[f32; 2]>,
 }
 
 /// The app's own window frame: its title bar, edge and corners.
@@ -237,6 +241,7 @@ impl Skin {
     /// swap it out.
     pub fn apply(&self, ctx: &egui::Context) {
         crate::dialog::set_input_size(ctx, self.input_size());
+        let spacing = self.spacing();
         let Some(base) = self.base else {
             ctx.set_theme(ThemePreference::System);
             for slot in [EguiTheme::Dark, EguiTheme::Light] {
@@ -244,6 +249,7 @@ impl Skin {
                     slot,
                     egui::Style {
                         visuals: slot.default_visuals(),
+                        spacing: spacing.clone(),
                         ..Default::default()
                     },
                 );
@@ -261,9 +267,26 @@ impl Skin {
                 slot,
                 egui::Style {
                     visuals: visuals.clone(),
+                    spacing: spacing.clone(),
                     ..Default::default()
                 },
             );
+        }
+    }
+
+    /// egui's spacing with the skin's button padding: `[controls] button_padding`,
+    /// held to 0 to 24 px, else a title bar button's (ADR-0035).
+    pub fn spacing(&self) -> egui::Spacing {
+        let [x, y] = self.controls.button_padding.unwrap_or({
+            let d = crate::dialog::BUTTON_PADDING;
+            [d.x, d.y]
+        });
+        egui::Spacing {
+            button_padding: egui::vec2(
+                x.clamp(0.0, crate::dialog::InputSize::MAX_PADDING),
+                y.clamp(0.0, crate::dialog::InputSize::MAX_PADDING),
+            ),
+            ..Default::default()
         }
     }
 
@@ -738,6 +761,29 @@ mod tests {
             "{:?}",
             skin.warnings
         );
+    }
+
+    #[test]
+    fn buttons_are_a_title_bar_buttons_size_unless_the_skin_says_otherwise() {
+        let size = |skin: &Skin| {
+            let ctx = egui::Context::default();
+            skin.apply(&ctx);
+            ctx.style_of(ctx.theme()).spacing.button_padding
+        };
+        let plain = Skin::parse("format = 1\nname = \"Plain\"\nbase = \"dark\"").unwrap();
+        assert_eq!(size(&plain), crate::dialog::BUTTON_PADDING);
+        let own =
+            Skin::parse("format = 1\nname = \"Own\"\nbase = \"dark\"\n[controls]\nbutton_padding = [4, 1]")
+                .unwrap();
+        assert_eq!(size(&own), egui::vec2(4.0, 1.0));
+        let wild = Skin::parse(
+            "format = 1\nname = \"Wild\"\nbase = \"dark\"\n[controls]\nbutton_padding = [90, -3]",
+        )
+        .unwrap();
+        assert_eq!(size(&wild), egui::vec2(24.0, 0.0), "held to the limits");
+        // The default skin, which follows the desktop, too.
+        let system = Skin::parse("format = 1\nname = \"System\"").unwrap();
+        assert_eq!(size(&system), crate::dialog::BUTTON_PADDING);
     }
 
     #[test]

@@ -74,6 +74,7 @@ mechanics of adding one. Patina apps should keep ADRs the same way
 | [0030](0030-the-frame-asks-the-compositor-for-the-window-shadow.md) | The frame asks the compositor for the window's shadow: `frame::shadow::request` | Accepted |
 | [0031](0031-colour-emoji-from-teleprinter.md) | Colour emoji are Patina's: the Teleprinter code, bundled and shared | Accepted |
 | [0032](0032-dialog-buttons-are-the-title-bar-s-size.md) | Dialog buttons are the title bar's size: `patina::dialog` | Accepted |
+| [0035](0035-buttons-are-a-title-bar-buttons-size-by-default.md) | Every button is a title bar button's size by default: `Skin::apply` sets the padding | Accepted |
 | [0034](0034-text-inputs-are-a-buttons-size.md) | Text inputs are a button's size: `dialog::text_edit` and `[controls] input_padding` | Accepted |
 | [0033](0033-tables-are-laid-out-like-html-and-hold-images.md) | Tables are laid out like HTML's, and hold images | Accepted |
 

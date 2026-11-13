@@ -37,12 +37,23 @@ is added there in the same commit (ADR-0025).
 
 ### Changed
 
+- Every button is a title bar button's size by default (ADR-0035): `Skin::apply` sets egui's
+  `spacing.button_padding` to 10 by 5 px, or to the skin's `[controls] button_padding` (`[4, 1]` is
+  egui's old size), so plain buttons, drop-downs, drag values and selectable labels are about 24 px
+  high, as dialog buttons and inputs are, with no change in the app. `Skin::spacing()` is the
+  value. Tabs, menus and the title bar, which size themselves, don't change.
 - Markdown tables look and lay out like HTML's (ADR-0033): joined cells with borders, text that
   wraps, as wide as the content wants up to the text's width, and images in cells (`![alt](src)`,
   `<img>`, inside a link too) shown. `markdown::embeds::table` takes the document's folder before
   the id; the `Editor` does this itself.
 
 ### Upgrading
+
+- **Buttons are bigger by default: look at toolbars and dense panels.** Plain egui buttons are
+  about 24 px high now, not 18, and 12 px wider; a row of them takes more room. To keep a place as
+  it was, set `ui.spacing_mut().button_padding = egui::vec2(4.0, 1.0)` in a scope there, or have
+  the skin say `[controls] button_padding = [4, 1]`. `dialog::buttons` is still how a row gets
+  the 8 px gap and the least height.
 
 - **Apps with dialogs, or any row of buttons outside the title bar: call `patina::dialog::buttons(ui)`
   first inside the row's layout, and make the button Enter presses `patina::dialog::primary`.**
