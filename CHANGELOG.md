@@ -11,6 +11,8 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.16 — 2026-11-13
+
 ### Fixed
 
 - Hovering a button, selectable label or other control no longer moves it by its border's width:

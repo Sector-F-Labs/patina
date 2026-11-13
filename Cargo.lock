@@ -2541,7 +2541,7 @@ version = "0.1.0"
 
 [[package]]
 name = "patina-ui"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "dirs",
  "eframe",
