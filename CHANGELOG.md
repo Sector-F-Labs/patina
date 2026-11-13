@@ -11,6 +11,22 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.19 — 2026-11-14
+
+### Fixed
+
+- A window minimised from Patina's own buttons stayed frozen on macOS after it was restored from
+  the Dock. egui-winit records `ViewportCommand::Minimized(true)` as `minimized = Some(true)` and,
+  on macOS, never reads the state back, so eframe went on treating the restored window as hidden
+  and never ran the UI again. The buttons now call `frame::minimise_window(ctx)`, which minimises
+  the `NSWindow` directly on macOS and sends the viewport command elsewhere.
+
+### Upgrading
+
+- If the app sends `ViewportCommand::Minimized(true)` itself (a menu item, a shortcut), call
+  `patina::frame::minimise_window(&ctx)` instead, from the UI thread. On macOS the viewport
+  command leaves the window frozen after a restore.
+
 ## 0.1.18 — 2026-11-13
 
 ### Added

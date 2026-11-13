@@ -1,6 +1,6 @@
 [package]
 name = "patina-ui"
-version = "0.1.18"
+version = "0.1.19"
 edition = "2024"
 license = "BSD-3-Clause"
 description = "Patina: the window frame, components and design language shared by Photograph, UnAmp and other egui desktop apps"
@@ -56,6 +56,9 @@ wayland-protocols-plasma = { version = "0.3", default-features = false, features
 muda = { version = "0.21", default-features = false }
 # The app's name in the menu bar, for a binary run outside an .app (menu::Menus::app_name).
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
+
+# Minimising a window on macOS (frame::minimise_window).
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSResponder", "NSWindow"] }
 
 [dev-dependencies]
 # The font the emoji tests install (no version: it is not published).

@@ -124,6 +124,30 @@ pub fn viewport(builder: egui::ViewportBuilder, custom: bool) -> egui::ViewportB
     builder.with_decorations(!custom).with_transparent(true)
 }
 
+/// Minimises the window. On macOS this goes straight to the `NSWindow`
+/// instead of `ViewportCommand::Minimized(true)`: egui-winit records that
+/// command as `ViewportInfo::minimized = Some(true)` and, on macOS, never
+/// reads the state back (it would deadlock). Restoring from the Dock then
+/// leaves `minimized` set for good, eframe sees an invisible window and
+/// stops running the UI, and the window stays frozen. Left alone, egui
+/// learns about visibility from winit's `Occluded` events, which do arrive.
+/// Call it from the UI thread, as the button handlers do.
+pub fn minimise_window(ctx: &egui::Context) {
+    #[cfg(target_os = "macos")]
+    {
+        use objc2_app_kit::NSApplication;
+        use objc2_foundation::MainThreadMarker;
+        if let Some(mtm) = MainThreadMarker::new() {
+            let app = NSApplication::sharedApplication(mtm);
+            if let Some(window) = app.keyWindow() {
+                window.miniaturize(None);
+                return;
+            }
+        }
+    }
+    ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+}
+
 /// For `App::clear_color`: transparent behind the app's own frame, so its
 /// rounded corners show the desktop, and the panel colour otherwise. The
 /// panels paint everything else.
@@ -394,7 +418,7 @@ impl<'a> TitleBar<'a> {
                         .on_hover_text("Minimise")
                         .clicked()
                 {
-                    ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+                    minimise_window(&ctx);
                 }
             }
             buttons_left = buttons.min_rect().left() - CONTROLS_GAP;
@@ -686,7 +710,7 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
         if resp.clicked() {
             match kind {
                 Button::Close => ctx.send_viewport_cmd(ViewportCommand::Close),
-                Button::Minimize => ctx.send_viewport_cmd(ViewportCommand::Minimized(true)),
+                Button::Minimize => minimise_window(ctx),
                 _ => ctx.send_viewport_cmd(ViewportCommand::Maximized(!maximized(ctx))),
             }
         }
@@ -697,7 +721,7 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
 fn window_menu(ui: &mut egui::Ui, ctx: &egui::Context) {
     if can_minimise_and_maximise() {
         if ui.button("Minimise").clicked() {
-            ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+            minimise_window(ctx);
         }
         let max = maximized(ctx);
         if ui
