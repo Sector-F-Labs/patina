@@ -69,6 +69,10 @@ pub struct FolderTree {
 
 /// Folders listed at once while a filter looks through the whole tree.
 const SCAN_AT_ONCE: usize = 8;
+
+/// How far apart a tree's rows are, in px: a list's rows, as Files' are, not a row
+/// of buttons, which are taller by default (ADR-0035).
+pub const ROW: f32 = 24.0;
 /// Folders a filter doesn't look inside unless they're already listed: build
 /// output and installed packages, which would bury what's wanted.
 const SCAN_SKIPS: [&str; 2] = ["target", "node_modules"];
@@ -221,6 +225,7 @@ impl FolderTree {
     pub fn show(&mut self, ui: &mut egui::Ui, current: &Path) -> Option<PathBuf> {
         // Hovering a row must not resize it (see `skin::steady_controls`).
         ui.scope(|ui| {
+            row_spacing(ui);
             crate::skin::steady_controls(ui);
             self.show_rows(ui, current)
         })
@@ -517,8 +522,32 @@ fn arrange(dir: &Path, entries: Vec<Entry>, files: bool) -> Vec<Item> {
     out
 }
 
+/// Makes the rows of this `ui` [`ROW`] apart, whatever the padding of buttons is.
+fn row_spacing(ui: &mut egui::Ui) {
+    let text = ui.text_style_height(&egui::TextStyle::Body);
+    let gap = ui.spacing().item_spacing.y;
+    ui.spacing_mut().button_padding = egui::vec2(4.0, ((ROW - gap - text) / 2.0).max(0.0));
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn rows_are_a_lists_whatever_buttons_are() {
+        let ctx = egui::Context::default();
+        // Buttons at the new default size: the tree's rows don't follow them.
+        let mut ys = Vec::new();
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            ui.spacing_mut().button_padding = egui::vec2(10.0, 5.0);
+            super::row_spacing(ui);
+            for _ in 0..3 {
+                ys.push(ui.selectable_label(false, "row").rect.top());
+            }
+        });
+        let pitch = ys[1] - ys[0];
+        assert!((pitch - super::ROW).abs() <= 1.0, "{pitch}");
+        assert!((ys[2] - ys[1] - pitch).abs() < 0.01);
+    }
+
     /// Whether egui flagged a widget id clash (a red box and a fire) in any
     /// frame while the tree loaded and opened `target`.
     fn clash_while_opening(files: bool) -> Vec<String> {

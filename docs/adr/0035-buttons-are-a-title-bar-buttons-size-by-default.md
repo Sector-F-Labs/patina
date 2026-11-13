@@ -39,5 +39,9 @@ boxes use `interact_size` and `icon_width`, not the padding.
   panels, take more room.
 - Widgets that draw their own size (the tabs, menus, the title bar's buttons, Files' toolbar
   glyph buttons) don't change.
+- **A list or tree is not a row of buttons.** The folder tree is made of `selectable_label`s, which
+  take the button padding, so it grew too, and looked wrong (the user saw it in the gallery). The
+  tree sets its own spacing, so its rows are `tree::ROW` (24 px) apart, as a list's are in Files,
+  whatever the buttons' size. An app's own lists made of selectable labels need the same.
 - An app that wants its old buttons somewhere sets `ui.spacing_mut().button_padding` in a scope;
   `dialog::buttons` is no longer needed for the padding, only for the gap and the least height.
