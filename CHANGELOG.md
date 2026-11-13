@@ -11,6 +11,15 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+## 0.1.18 — 2026-11-13
+
+### Added
+
+- `Menus::app_name("Photograph")`: the app's name as macOS's menu bar shows it, and the title of
+  the app menu. A packaged app gets its name from `Info.plist` (`CFBundleName`); a binary run on its
+  own (`cargo run`) showed its file name in lower case. Sets the process name; nothing happens
+  off macOS. Optional.
+
 ## 0.1.17 — 2026-11-13
 
 ### Changed

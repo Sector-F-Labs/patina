@@ -69,7 +69,7 @@ pub(super) fn show<A: Clone + 'static>(ctx: &egui::Context, menus: &Menus<A>) ->
         }
     });
 
-    let mut sig = String::new();
+    let mut sig = format!("{:?}", menus.app_name);
     let mut actions: Vec<Box<dyn Any>> = Vec::new();
     let mut roles = Vec::new();
     let mut bar = Vec::new();
@@ -81,7 +81,13 @@ pub(super) fn show<A: Clone + 'static>(ctx: &egui::Context, menus: &Menus<A>) ->
     }
     let same = BUILT.with(|b| b.borrow().as_ref().is_some_and(|b| b.signature == sig));
     if !same {
-        let menu = build(bar, roles);
+        if let Some(name) = &menus.app_name {
+            // The menu bar's title for the app comes from the process name when there's
+            // no bundle to say.
+            use objc2_foundation::{NSProcessInfo, NSString};
+            NSProcessInfo::processInfo().setProcessName(&NSString::from_str(name));
+        }
+        let menu = build(bar, roles, menus.app_name.as_deref().unwrap_or("App"));
         menu.init_for_nsapp();
         BUILT.with(|b| {
             *b.borrow_mut() = Some(Built {
@@ -210,9 +216,9 @@ fn lower<A: Clone + 'static>(
     out
 }
 
-fn build(bar: Vec<(String, Vec<Lowered>)>, roles: Vec<RoleItem>) -> Menu {
+fn build(bar: Vec<(String, Vec<Lowered>)>, roles: Vec<RoleItem>, app: &str) -> Menu {
     let menu = Menu::new();
-    let _ = menu.append(&app_menu(roles));
+    let _ = menu.append(&app_menu(roles, app));
     for (label, entries) in bar {
         let sub = Submenu::new(label, true);
         fill(&sub, entries);
@@ -221,8 +227,8 @@ fn build(bar: Vec<(String, Vec<Lowered>)>, roles: Vec<RoleItem>) -> Menu {
     menu
 }
 
-fn app_menu(mut roles: Vec<RoleItem>) -> Submenu {
-    let app = Submenu::new("App", true);
+fn app_menu(mut roles: Vec<RoleItem>, name: &str) -> Submenu {
+    let app = Submenu::new(name, true);
     let mut take = |role: Role| {
         roles
             .iter()

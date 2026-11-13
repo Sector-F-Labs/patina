@@ -124,17 +124,31 @@ pub struct Menu<A> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Menus<A> {
     pub menus: Vec<Menu<A>>,
+    /// The app's name as the menu bar shows it on macOS.
+    pub app_name: Option<String>,
 }
 
 impl<A> Default for Menus<A> {
     fn default() -> Self {
-        Self { menus: Vec::new() }
+        Self {
+            menus: Vec::new(),
+            app_name: None,
+        }
     }
 }
 
 impl<A> Menus<A> {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The app's name as macOS's menu bar shows it, in capitals if you give it so
+    /// ("Photograph"). A packaged app takes it from its `Info.plist`
+    /// (`CFBundleName`); this is for a binary run on its own, which would
+    /// show its file name ("photograph"). Not used elsewhere.
+    pub fn app_name(mut self, name: impl Into<String>) -> Self {
+        self.app_name = Some(name.into());
+        self
     }
 
     /// Adds a menu to the right of the ones so far.
