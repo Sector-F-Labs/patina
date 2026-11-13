@@ -2587,6 +2587,7 @@ dependencies = [
  "image",
  "libc",
  "muda",
+ "objc2-foundation 0.3.2",
  "patina-emoji-font",
  "pulldown-cmark",
  "raw-window-handle",
