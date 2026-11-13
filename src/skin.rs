@@ -248,7 +248,11 @@ impl Skin {
                 ctx.set_style_of(
                     slot,
                     egui::Style {
-                        visuals: slot.default_visuals(),
+                        visuals: {
+                            let mut v = slot.default_visuals();
+                            steady_visuals(&mut v);
+                            v
+                        },
                         spacing: spacing.clone(),
                         ..Default::default()
                     },
@@ -401,6 +405,7 @@ impl Skin {
             v.window_shadow = Shadow::NONE;
             v.popup_shadow = Shadow::NONE;
         }
+        steady_visuals(&mut v);
         v
     }
 
@@ -807,7 +812,12 @@ mod tests {
 /// The tree and the title bar use it; apps call it for lists of
 /// `selectable_label`s of their own, such as a sidebar.
 pub fn steady_controls(ui: &mut egui::Ui) {
-    let w = &mut ui.visuals_mut().widgets;
+    steady_visuals(ui.visuals_mut());
+}
+
+/// [`steady_controls`] on visuals; [`Skin::apply`] does it for every control.
+pub fn steady_visuals(v: &mut egui::Visuals) {
+    let w = &mut v.widgets;
     w.inactive.expansion = w.inactive.bg_stroke.width;
     for state in [&mut w.hovered, &mut w.active, &mut w.open] {
         state.expansion = 0.0;

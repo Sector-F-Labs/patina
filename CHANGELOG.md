@@ -11,6 +11,12 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Fixed
+
+- Hovering a button, selectable label or other control no longer moves it by its border's width:
+  `Skin::visuals` and `Skin::apply` now apply `skin::steady_visuals` (what `steady_controls` did
+  for the tree and the title bar) to every control. Nothing to change in an app.
+
 ### Added
 
 - `patina::emoji` (cargo feature `emoji`): colour emoji from a bundled Noto Color Emoji (SIL OFL),

@@ -416,8 +416,12 @@ fn load_skins() -> (Vec<Skin>, Vec<String>) {
 }
 
 impl eframe::App for Gallery {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, eframe_frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
+        // The window draws its own frame, so the compositor is asked for its drop shadow (once).
+        if self.custom_frame {
+            frame::shadow::request(eframe_frame);
+        }
         self.tree.poll();
         let style = self.skins[self.skin].frame_style(ui.visuals());
         let radius = if self.custom_frame {
