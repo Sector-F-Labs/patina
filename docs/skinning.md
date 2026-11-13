@@ -96,6 +96,8 @@ example.
 | `text` | Text and icons on controls (defaults to `colors.text`) |
 | `text_hover` | Text on hovered or pressed controls (defaults to `colors.text_strong`) |
 | `border` | Control outlines (defaults to `colors.border`) |
+| `input_padding` | Padding inside text inputs, `[across, down]` in px, 0 to 24 (default `[10, 5]`, a button's) |
+| `input_height` | Least height of a text input in px, 16 to 64 (default 24, a button's) |
 
 egui draws buttons with one fill and slider/checkbox tracks with another. Tracks at rest use
 `colors.surface`, so they stay visible when `controls.background` matches `colors.background`.

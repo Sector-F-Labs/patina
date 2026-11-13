@@ -133,7 +133,7 @@ impl FolderTree {
                 self.cursor_moved = true;
             }
         }
-        let edit = egui::TextEdit::singleline(&mut self.filter)
+        let edit = crate::dialog::text_edit(ui, &mut self.filter)
             .id(id)
             .hint_text("Filter files")
             .desired_width(f32::INFINITY);

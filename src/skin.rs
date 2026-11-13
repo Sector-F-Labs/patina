@@ -116,6 +116,10 @@ pub struct Controls {
     pub text: Option<Hex>,
     pub text_hover: Option<Hex>,
     pub border: Option<Hex>,
+    /// Padding inside text inputs, `[across, down]` in px; 10 by 5, a button's, when unset.
+    pub input_padding: Option<[f32; 2]>,
+    /// Least height of a text input in px; 24, a button's, when unset.
+    pub input_height: Option<f32>,
 }
 
 /// The app's own window frame: its title bar, edge and corners.
@@ -232,6 +236,7 @@ impl Skin {
     /// fixes egui's light or dark theme, in both of egui's slots so a desktop switch can't
     /// swap it out.
     pub fn apply(&self, ctx: &egui::Context) {
+        crate::dialog::set_input_size(ctx, self.input_size());
         let Some(base) = self.base else {
             ctx.set_theme(ThemePreference::System);
             for slot in [EguiTheme::Dark, EguiTheme::Light] {
@@ -260,6 +265,20 @@ impl Skin {
                 },
             );
         }
+    }
+
+    /// How big the skin makes text inputs: `[controls] input_padding` and
+    /// `input_height` over a button's size, held to sane limits.
+    pub fn input_size(&self) -> crate::dialog::InputSize {
+        let d = crate::dialog::InputSize::default();
+        crate::dialog::InputSize {
+            padding: self
+                .controls
+                .input_padding
+                .map_or(d.padding, |[x, y]| egui::vec2(x, y)),
+            height: self.controls.input_height.unwrap_or(d.height),
+        }
+        .clamped()
     }
 
     /// `base` (egui's visuals for this skin's `base`) with the skin's

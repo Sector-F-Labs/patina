@@ -25,6 +25,12 @@ is added there in the same commit (ADR-0025).
   (ADR-0028); `dialog::primary(ui, text)` is the button Enter presses, in the skin's accent.
   The constants are `BUTTON_PADDING`, `BUTTON_HEIGHT` and `BUTTON_GAP`. The title bar's buttons are
   unchanged.
+- `dialog::text_edit(ui, &mut text)`: a single-line input padded as a button is (10 by 5 px) and
+  at least 24 px high, since egui's `TextEdit` takes its 4 by 2 px margin from no style (ADR-0034).
+  The size is `dialog::input_size(ctx)`, which a skin sets with `[controls] input_padding` and
+  `input_height` (`Skin::apply` does it), and an app with `dialog::set_input_size`. `INPUT_PADDING`,
+  `INPUT_HEIGHT` and `InputSize` are the pieces. The folder tree's filter box uses it, so it is 24
+  px high now, up from 22, and the text starts 10 px in, up from 4.
 - The markdown `Editor` draws emoji in colour when both `markdown` and `emoji` are enabled: they
   are laid out invisibly, so cursor, selection and wrapping work as before, and the colour image is
   painted over them.
