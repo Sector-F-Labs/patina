@@ -11,6 +11,18 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Changed
+
+- A maximised window keeps its rounded corners, border and the window shadow's shape, as on macOS
+  and Windows. Squaring them as GNOME does is opt-in now: `frame::set_square_when_maximised(ctx, true)`.
+  **Upgrading:** an app that wants the old look on Linux calls it once (e.g. in its first frame).
+
+### Added
+
+- `TitleBar::window_buttons(WindowButtons)`: `WindowButtons::MacOs` draws red, yellow and green
+  traffic lights at the left, `Patina` the existing buttons at the right. The default is
+  `WindowButtons::platform()`: macOS's on macOS, Patina's elsewhere. Nothing to change in an app.
+
 ## 0.1.16 — 2026-11-13
 
 ### Fixed
