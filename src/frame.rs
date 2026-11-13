@@ -579,8 +579,11 @@ enum Button {
 /// macOS's traffic lights, from `row`'s left edge. Returns the x where the
 /// app's own controls can start.
 fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise: bool) -> f32 {
-    const DIAMETER: f32 = 12.0;
-    const GAP: f32 = 8.0;
+    // Measured from `standardWindowButton` on macOS 27: 14 pt circles 9 pt apart,
+    // the first 9 pt from the window's left edge.
+    const DIAMETER: f32 = 14.0;
+    const GAP: f32 = 9.0;
+    const INSET: f32 = 9.0;
     let can = can_minimise_and_maximise();
     let lights: &[(Button, Color32, &str)] = &[
         (Button::Close, Color32::from_rgb(0xff, 0x5f, 0x57), "Close"),
@@ -604,7 +607,9 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
             _ => can,
         })
         .collect();
-    let mut x = row.left();
+    // `row` starts inside the header's padding; the lights count from the window's edge.
+    let start = row.left() - f32::from(HEADER_MARGIN.left) + INSET;
+    let mut x = start;
     let mut rects = Vec::new();
     for _ in &shown {
         rects.push(egui::Rect::from_center_size(
@@ -615,7 +620,7 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
     }
     let right = x - GAP;
     let group = egui::Rect::from_min_max(
-        egui::pos2(row.left(), row.top()),
+        egui::pos2(start, row.top()),
         egui::pos2(right, row.bottom()),
     );
     // The glyphs show while the pointer is anywhere over the three.
@@ -647,16 +652,16 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
         );
         if over {
             let ink = Color32::from_black_alpha(0xb0);
-            let stroke = Stroke::new(1.1, ink);
+            let stroke = Stroke::new(1.3, ink);
             let c = rect.center();
-            let r = 2.4;
+            let r = 2.8;
             match kind {
                 Button::Close => {
                     painter.line_segment([c + vec2(-r, -r), c + vec2(r, r)], stroke);
                     painter.line_segment([c + vec2(-r, r), c + vec2(r, -r)], stroke);
                 }
                 Button::Minimize => {
-                    painter.line_segment([c + vec2(-r - 0.5, 0.0), c + vec2(r + 0.5, 0.0)], stroke);
+                    painter.line_segment([c + vec2(-r - 0.6, 0.0), c + vec2(r + 0.6, 0.0)], stroke);
                 }
                 _ => {
                     // Zoom's two opposing triangles.
@@ -667,8 +672,8 @@ fn mac_buttons(ui: &mut egui::Ui, row: egui::Rect, ctx: &egui::Context, minimise
                         painter.add(egui::Shape::convex_polygon(
                             vec![
                                 tip,
-                                tip + vec2(-sign * 2.8, 0.0),
-                                tip + vec2(0.0, sign * 2.8),
+                                tip + vec2(-sign * 3.3, 0.0),
+                                tip + vec2(0.0, sign * 3.3),
                             ],
                             ink,
                             Stroke::NONE,
