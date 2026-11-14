@@ -11,6 +11,14 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Added
+
+- `FolderTree::navigate(Nav)` and `set_keyboard(bool)`: the keyboard moves through the tree's rows
+  (`Nav::Down`, `Up`, `Top`, `Bottom`, `Open` a folder or go into it, `Close` it or go to its
+  parent, `Activate`), done as the rows are drawn; a file to open comes back from `show` as a click
+  does. While a filter is on the same calls move through the matches. The row the keyboard is on is
+  drawn selected while `set_keyboard(true)`. For an app with vim keys. Nothing to change in an app.
+
 ### Fixed
 
 - A menu item with a check or a radio and a shortcut (`Entry::item(..).check(..).shortcut(..)`) showed no

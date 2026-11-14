@@ -44,6 +44,31 @@ struct Listing {
     result: Result<Vec<Item>, String>,
 }
 
+/// A key's worth of moving the keyboard through a tree ([`FolderTree::navigate`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Nav {
+    /// The next row (the next match, while filtering).
+    Down,
+    Up,
+    Top,
+    Bottom,
+    /// Opens a folder, or goes into one that's open; on a file, opens it.
+    Open,
+    /// Closes a folder, or goes to the folder around a file or a closed one.
+    Close,
+    /// Opens or closes a folder; opens a file (it comes back from `show`, as a click does).
+    Activate,
+}
+
+/// A row as drawn, for the keyboard to move through.
+struct Row {
+    path: PathBuf,
+    /// A folder (even one with nothing in it) and not a file.
+    dir: bool,
+    /// The folder's open or closed state, in egui's memory, if it has anything to open.
+    folder: Option<egui::Id>,
+}
+
 pub struct FolderTree {
     root: PathBuf,
     root_label: String,
@@ -65,6 +90,14 @@ pub struct FolderTree {
     open_cursor: bool,
     /// The cursor moved: scroll it into view.
     cursor_moved: bool,
+    /// What the keyboard asked for, done as the rows are drawn next.
+    nav: Option<Nav>,
+    /// The row the keyboard is on, and whether to show it.
+    kb: Option<PathBuf>,
+    kb_shown: bool,
+    kb_scroll: bool,
+    /// The rows drawn this frame, in order.
+    rows: Vec<Row>,
 }
 
 /// Folders listed at once while a filter looks through the whole tree.
@@ -97,6 +130,11 @@ impl FolderTree {
             cursor: 0,
             open_cursor: false,
             cursor_moved: false,
+            nav: None,
+            kb: None,
+            kb_shown: false,
+            kb_scroll: false,
+            rows: Vec::new(),
         }
     }
 
@@ -105,6 +143,18 @@ impl FolderTree {
     pub fn files(mut self, on: bool) -> Self {
         self.files = on;
         self
+    }
+
+    /// Moves the keyboard through the rows, at the next [`Self::show`] (a vim user's `j`, `k`,
+    /// `l`, `h` and Enter). While a filter is on it moves through the matches instead.
+    pub fn navigate(&mut self, nav: Nav) {
+        self.nav = Some(nav);
+    }
+
+    /// Whether the row the keyboard is on is drawn selected: on while the keyboard is the
+    /// tree's, off when it's elsewhere.
+    pub fn set_keyboard(&mut self, on: bool) {
+        self.kb_shown = on;
     }
 
     /// Lists folders with `lister` instead of reading this machine's disk,
@@ -239,8 +289,75 @@ impl FolderTree {
         let mut clicked = None;
         let root = self.root.clone();
         let label = self.root_label.clone();
+        self.rows.clear();
         self.node(ui, &root, &label, current, true, &mut clicked);
-        clicked
+        self.kb_scroll = false;
+        clicked.or_else(|| self.apply_nav(ui.ctx(), current))
+    }
+
+    /// Does what the keyboard asked, with the rows just drawn. A file to open comes back.
+    fn apply_nav(&mut self, ctx: &egui::Context, current: &Path) -> Option<PathBuf> {
+        let nav = self.nav.take()?;
+        if self.rows.is_empty() {
+            return None;
+        }
+        let at = self
+            .kb
+            .as_ref()
+            .and_then(|p| self.rows.iter().position(|r| &r.path == p))
+            .or_else(|| self.rows.iter().position(|r| r.path == current))
+            .unwrap_or(0);
+        let last = self.rows.len() - 1;
+        let is_open = |row: &Row| {
+            row.folder
+                .is_some_and(|id| CollapsingState::load_with_default_open(ctx, id, false).is_open())
+        };
+        let set_open = |row: &Row, open: bool| {
+            if let Some(id) = row.folder {
+                let mut state = CollapsingState::load_with_default_open(ctx, id, false);
+                state.set_open(open);
+                state.store(ctx);
+            }
+        };
+        let row = &self.rows[at];
+        let mut to = at;
+        let mut opened = None;
+        match nav {
+            Nav::Down => to = (at + 1).min(last),
+            Nav::Up => to = at.saturating_sub(1),
+            Nav::Top => to = 0,
+            Nav::Bottom => to = last,
+            Nav::Open => {
+                if !row.dir {
+                    opened = Some(row.path.clone());
+                } else if row.folder.is_none() {
+                } else if !is_open(row) {
+                    set_open(row, true);
+                } else {
+                    to = (at + 1).min(last);
+                }
+            }
+            Nav::Close => {
+                if row.folder.is_some() && is_open(row) && at > 0 {
+                    set_open(row, false);
+                } else if let Some(parent) = row.path.parent()
+                    && let Some(i) = self.rows.iter().position(|r| r.path == parent)
+                {
+                    to = i;
+                }
+            }
+            Nav::Activate => {
+                if row.dir {
+                    set_open(row, !is_open(row));
+                } else {
+                    opened = Some(row.path.clone());
+                }
+            }
+        }
+        self.kb = Some(self.rows[to].path.clone());
+        self.kb_scroll = true;
+        ctx.request_repaint();
+        opened
     }
 
     /// The filter's matches as a flat list: each name with the folder it's
@@ -251,6 +368,16 @@ impl FolderTree {
         let (found, pending) = self.scan(&query, ui.ctx());
         let mut clicked = None;
         let shown = found.len().min(SHOWN_AT_MOST);
+        let nav = self.nav.take();
+        self.cursor_moved |= nav.is_some();
+        match nav {
+            Some(Nav::Down) => self.cursor += 1,
+            Some(Nav::Up) => self.cursor = self.cursor.saturating_sub(1),
+            Some(Nav::Top) => self.cursor = 0,
+            Some(Nav::Bottom) => self.cursor = shown,
+            Some(Nav::Open | Nav::Activate) => self.open_cursor = true,
+            Some(Nav::Close) | None => {}
+        }
         self.cursor = self.cursor.min(shown.saturating_sub(1));
         if std::mem::take(&mut self.open_cursor) {
             clicked = found.get(self.cursor).map(|item| item.path.clone());
@@ -372,13 +499,24 @@ impl FolderTree {
         let is_current = path == current;
         let icon = if is_current { "\u{1F4C2}" } else { "\u{1F4C1}" };
         let label = format!("{icon} {name}");
+        let has_children = !matches!(self.children.get(path), Some(Children::Loaded(c)) if c.is_empty());
+        self.rows.push(Row {
+            path: path.to_path_buf(),
+            dir: true,
+            folder: has_children.then_some(id),
+        });
+        let here = self.kb_shown && self.kb.as_deref() == Some(path);
+        let scroll = here && self.kb_scroll;
 
         let header = |ui: &mut egui::Ui, clicked: &mut Option<PathBuf>| {
             let resp = ui
-                .selectable_label(is_current, &label)
+                .selectable_label(is_current || here, &label)
                 .on_hover_text(path.display().to_string());
             if resp.clicked() {
                 *clicked = Some(path.to_path_buf());
+            }
+            if scroll {
+                resp.scroll_to_me(None);
             }
             resp
         };
@@ -428,15 +566,27 @@ impl FolderTree {
         current: &Path,
         clicked: &mut Option<PathBuf>,
     ) {
+        self.rows.push(Row {
+            path: item.path.clone(),
+            dir: false,
+            folder: None,
+        });
+        let here = self.kb_shown && self.kb.as_deref() == Some(item.path.as_path());
         let resp = ui
             .horizontal(|ui| {
                 ui.add_space(ui.spacing().icon_width + ui.spacing().icon_spacing);
-                ui.selectable_label(item.path == current, format!("\u{1F4C4} {}", item.name))
-                    .on_hover_text(item.path.display().to_string())
+                ui.selectable_label(
+                    item.path == current || here,
+                    format!("\u{1F4C4} {}", item.name),
+                )
+                .on_hover_text(item.path.display().to_string())
             })
             .inner;
         if resp.clicked() {
             *clicked = Some(item.path.clone());
+        }
+        if here && self.kb_scroll {
+            resp.scroll_to_me(None);
         }
         self.finish_reveal(&item.path, &resp);
     }
@@ -806,6 +956,56 @@ mod tests {
         frame(&ctx, &mut tree, vec![press(egui::Key::ArrowUp, none)]);
         let opened = frame(&ctx, &mut tree, vec![press(egui::Key::Enter, none)]);
         assert_eq!(opened, Some(dir.join("b.rs")));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_keyboard_moves_through_rows_opens_folders_and_files() {
+        let dir = std::env::temp_dir().join(format!("patina-tree-nav-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("sub")).unwrap();
+        std::fs::write(dir.join("sub").join("inner.rs"), b"").unwrap();
+        std::fs::write(dir.join("top.rs"), b"").unwrap();
+        let mut tree = FolderTree::new(dir.clone(), "p".into()).files(true);
+        tree.set_keyboard(true);
+        let ctx = egui::Context::default();
+        let nothing = |tree: &mut FolderTree, nav: Option<Nav>| {
+            tree.nav = nav;
+            frame(&ctx, tree, vec![])
+        };
+        // Let the root be listed and drawn.
+        for _ in 0..100 {
+            nothing(&mut tree, None);
+            if tree.rows.iter().any(|r| r.path == dir.join("top.rs")) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let at = |tree: &FolderTree| tree.kb.clone();
+        nothing(&mut tree, Some(Nav::Down));
+        assert_eq!(at(&tree), Some(dir.join("sub")), "the first row is the root, then sub");
+        nothing(&mut tree, Some(Nav::Open));
+        for _ in 0..100 {
+            nothing(&mut tree, None);
+            if tree.rows.iter().any(|r| r.path == dir.join("sub").join("inner.rs")) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        nothing(&mut tree, Some(Nav::Down));
+        assert_eq!(at(&tree), Some(dir.join("sub").join("inner.rs")), "into the open folder");
+        nothing(&mut tree, Some(Nav::Close));
+        assert_eq!(at(&tree), Some(dir.join("sub")), "h goes to the folder around a file");
+        nothing(&mut tree, Some(Nav::Close));
+        nothing(&mut tree, None);
+        let id = tree.rows.iter().find(|r| r.path == dir.join("sub")).and_then(|r| r.folder).unwrap();
+        // (Its body is drawn a moment longer, while it folds.)
+        assert!(!CollapsingState::load_with_default_open(&ctx, id, true).is_open(), "and closes it");
+        nothing(&mut tree, Some(Nav::Bottom));
+        assert_eq!(at(&tree), Some(dir.join("top.rs")));
+        assert_eq!(nothing(&mut tree, Some(Nav::Activate)), Some(dir.join("top.rs")), "Enter opens a file");
+        nothing(&mut tree, Some(Nav::Top));
+        assert_eq!(at(&tree), Some(dir.clone()));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
