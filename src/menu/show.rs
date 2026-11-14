@@ -114,10 +114,18 @@ fn draw<A: Clone>(ui: &mut Ui, entries: &[Entry<A>], out: &mut Option<A>) {
                 ..
             } => {
                 let clicked = ui
-                    .add_enabled_ui(*enabled, |ui| match mark {
-                        Mark::Check(on) => ui.checkbox(&mut { *on }, label).clicked(),
-                        Mark::Radio(on) => ui.radio(*on, label).clicked(),
-                        Mark::None => {
+                    .add_enabled_ui(*enabled, |ui| match (mark, shortcut) {
+                        // A check or radio with a shortcut is a flat button lit when on, since
+                        // the checkbox and the radio have no room for the shortcut's text.
+                        (Mark::Check(on) | Mark::Radio(on), Some(s)) => ui
+                            .add(
+                                Button::selectable(*on, label)
+                                    .shortcut_text(ui.ctx().format_shortcut(s)),
+                            )
+                            .clicked(),
+                        (Mark::Check(on), None) => ui.checkbox(&mut { *on }, label).clicked(),
+                        (Mark::Radio(on), None) => ui.radio(*on, label).clicked(),
+                        (Mark::None, shortcut) => {
                             let mut b = Button::new(label);
                             if let Some(s) = shortcut {
                                 b = b.shortcut_text(ui.ctx().format_shortcut(s));

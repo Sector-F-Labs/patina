@@ -11,6 +11,12 @@ is added there in the same commit (ADR-0025).
 
 ## Unreleased
 
+### Fixed
+
+- A menu item with a check or a radio and a shortcut (`Entry::item(..).check(..).shortcut(..)`) showed no
+  shortcut in the window's menus: its text was left out. It is a flat button lit when on now, with the
+  shortcut at its right. Items without a shortcut keep their checkbox or radio. Nothing to change in an app.
+
 ## 0.1.19 — 2026-11-14
 
 ### Fixed
