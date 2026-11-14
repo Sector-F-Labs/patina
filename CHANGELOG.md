@@ -13,6 +13,11 @@ is added there in the same commit (ADR-0025).
 
 ### Added
 
+- `tabs::keys_leaving_close(ctx, count, shown)`: `tabs::keys` without Ctrl+W, for an app that uses
+  that key for something else (vim's window commands). Nothing to change in an app.
+
+### Added
+
 - `FolderTree::navigate(Nav)` and `set_keyboard(bool)`: the keyboard moves through the tree's rows
   (`Nav::Down`, `Up`, `Top`, `Bottom`, `Open` a folder or go into it, `Close` it or go to its
   parent, `Activate`), done as the rows are drawn; a file to open comes back from `show` as a click

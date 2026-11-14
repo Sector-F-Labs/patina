@@ -468,7 +468,17 @@ struct Look<'t> {
 ///
 /// On the Patina desktop, Super+T and Super+W arrive as these keys.
 pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction> {
-    keys_with(ctx, count, shown, egui::Modifiers::CTRL)
+    keys_with(ctx, count, shown, egui::Modifiers::CTRL, true)
+}
+
+/// [`keys`] without Ctrl+W, for an app where that key means something else (vim's window
+/// commands): Ctrl+T, Ctrl+PageUp/PageDown and Alt+digits as before, and Ctrl+W left for the app.
+pub fn keys_leaving_close(
+    ctx: &egui::Context,
+    count: usize,
+    shown: usize,
+) -> Option<TabAction> {
+    keys_with(ctx, count, shown, egui::Modifiers::CTRL, false)
 }
 
 /// [`keys`] for a terminal, whose Ctrl+T and Ctrl+W belong to the shell:
@@ -480,6 +490,7 @@ pub fn terminal_keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<
         count,
         shown,
         egui::Modifiers::CTRL | egui::Modifiers::SHIFT,
+        true,
     )
 }
 
@@ -489,6 +500,7 @@ fn keys_with(
     count: usize,
     shown: usize,
     new_close: egui::Modifiers,
+    close: bool,
 ) -> Option<TabAction> {
     const DIGITS: [egui::Key; 9] = {
         use egui::Key::*;
@@ -499,7 +511,7 @@ fn keys_with(
         if consume_exact(i, new_close, egui::Key::T) {
             action = Some(TabAction::New);
         }
-        if count > 0 && consume_exact(i, new_close, egui::Key::W) {
+        if close && count > 0 && consume_exact(i, new_close, egui::Key::W) {
             action = Some(TabAction::Close(shown.min(count - 1)));
         }
         if count > 0 && i.consume_key(egui::Modifiers::CTRL, egui::Key::PageUp) {
