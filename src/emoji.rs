@@ -278,10 +278,23 @@ fn is_pair(s: &str) -> bool {
 /// Text with its emoji in colour: plain stretches as labels, emoji as
 /// images the height of a line, wrapping at the width available.
 pub fn label(ui: &mut Ui, text: &str) {
-    let height = ui.text_style_height(&egui::TextStyle::Body);
+    let size = egui::TextStyle::Body.resolve(ui.style()).size;
+    label_with(ui, text, size, |t| t);
+}
+
+/// [`label`] with the text's size and style chosen: `style` turns each plain
+/// stretch (already `size` points) into the rich text to show, to make it
+/// strong, weak, coloured. Emoji are the height of a line at `size`.
+pub fn label_with(
+    ui: &mut Ui,
+    text: &str,
+    size: f32,
+    style: impl Fn(egui::RichText) -> egui::RichText,
+) {
+    let height = ui.fonts_mut(|f| f.row_height(&egui::FontId::proportional(size)));
     let parts = runs(text);
     if parts.iter().all(|r| matches!(r, Run::Text(_))) {
-        ui.label(text);
+        ui.label(style(egui::RichText::new(text).size(size)));
         return;
     }
     ui.horizontal_wrapped(|ui| {
@@ -289,7 +302,7 @@ pub fn label(ui: &mut Ui, text: &str) {
         for run in parts {
             match run {
                 Run::Text(t) => {
-                    ui.label(t);
+                    ui.label(style(egui::RichText::new(t).size(size)));
                 }
                 Run::Emoji(_, g) => {
                     let (rect, _) =

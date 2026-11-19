@@ -17,6 +17,8 @@ is added there in the same commit (ADR-0025).
   with a painter, its emoji in colour and the text cut with an ellipsis at `max_width`;
   `Line::size()` and `Line::paint(painter, pos)`. For where `emoji::label` doesn't fit: a name in a
   list, a title in a card. Nothing to change in an app.
+- `emoji::label_with(ui, text, size, style)`: `emoji::label` with the text's size and style (strong,
+  weak, coloured) chosen. Nothing to change in an app.
 - `tabs::keys_leaving_close(ctx, count, shown)`: `tabs::keys` without Ctrl+W, for an app that uses
   that key for something else (vim's window commands). Nothing to change in an app.
 
