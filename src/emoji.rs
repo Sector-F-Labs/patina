@@ -316,6 +316,101 @@ pub fn label_with(
     });
 }
 
+/// An emoji [`hide`] laid out invisibly in a job: where it starts and how
+/// many characters it takes (in characters of the job's text), and its glyph.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Placed {
+    start: usize,
+    len: usize,
+    glyph: Glyph,
+}
+
+/// Makes the emoji in `job` invisible, so they take room, and the cursor and
+/// selection of a text edit find them, and says where they are for
+/// [`paint_placed`] to draw in colour over them (egui draws no colour). Call
+/// it on the job a `TextEdit` layouter makes, and paint after the edit.
+/// Nothing is changed, and nothing found, for text without emoji or before
+/// a font is installed.
+pub fn hide(job: &mut egui::text::LayoutJob) -> Vec<Placed> {
+    let mut placed = Vec::new();
+    if job.text.is_ascii() || FONT.get().is_none() {
+        return placed;
+    }
+    let sections = std::mem::take(&mut job.sections);
+    let (mut chars, mut at) = (0, 0);
+    for section in sections {
+        let range = section.byte_range.start.0..section.byte_range.end.0;
+        chars += job.text[at..range.start].chars().count();
+        at = range.end;
+        let parts = runs(&job.text[range.clone()]);
+        if parts.iter().all(|r| matches!(r, Run::Text(_))) {
+            chars += job.text[range].chars().count();
+            job.sections.push(section);
+            continue;
+        }
+        let mut from = range.start;
+        for (i, run) in parts.into_iter().enumerate() {
+            let (text, glyph) = match run {
+                Run::Text(t) => (t, None),
+                Run::Emoji(t, g) => (t, Some(g)),
+            };
+            let mut format = section.format.clone();
+            let len = text.chars().count();
+            if let Some(glyph) = glyph {
+                placed.push(Placed {
+                    start: chars,
+                    len,
+                    glyph,
+                });
+                format.color = Color32::TRANSPARENT;
+            }
+            job.sections.push(egui::text::LayoutSection {
+                leading_space: if i == 0 { section.leading_space } else { 0.0 },
+                byte_range: egui::text::ByteIndex(from)..egui::text::ByteIndex(from + text.len()),
+                format,
+            });
+            from += text.len();
+            chars += len;
+        }
+    }
+    placed
+}
+
+/// Draws the emoji [`hide`] found, in colour, over their invisible places in
+/// `galley`, whose top left is at `origin` (a `TextEdit`'s `galley_pos`).
+pub fn paint_placed(
+    painter: &egui::Painter,
+    galley: &egui::Galley,
+    origin: egui::Pos2,
+    placed: &[Placed],
+) {
+    let clip = painter.clip_rect();
+    for p in placed {
+        let mut row_start = 0;
+        for row in &galley.rows {
+            let count = row.char_count_including_newline().0;
+            let row_end = row_start + row.row.char_count_excluding_newline().0;
+            if p.start >= row_start && p.start < row_end.max(row_start + 1) {
+                let band = row.rect();
+                if origin.y + band.max.y >= clip.min.y && origin.y + band.min.y <= clip.max.y {
+                    let end = (p.start + p.len).min(row_end);
+                    let x0 =
+                        row.pos.x + row.row.x_offset(egui::text::CharIndex(p.start - row_start));
+                    let x1 = row.pos.x + row.row.x_offset(egui::text::CharIndex(end - row_start));
+                    let w = (x1 - x0).max(band.height());
+                    let rect = Rect::from_min_size(
+                        pos2(origin.x + x0, origin.y + band.min.y),
+                        vec2(w, band.height()),
+                    );
+                    paint(painter, p.glyph, rect);
+                }
+                break;
+            }
+            row_start += count;
+        }
+    }
+}
+
 /// One line of text laid out for painting with its emoji in colour: what a
 /// row drawn with a [`egui::Painter`] (a file's name, a notification's
 /// title) uses where [`label`] doesn't fit, because it can't be cut at a
@@ -493,6 +588,39 @@ mod tests {
             let cut = line(painter, "a long name 🐡 with more", font, white, 60.0);
             assert!(cut.size().x <= 60.5, "{}", cut.size().x);
         });
+    }
+
+    #[test]
+    fn hidden_emoji_are_found_by_character_and_laid_out_invisibly() {
+        assert!(install(patina_emoji_font::FONT));
+        let mut job = egui::text::LayoutJob::simple_singleline(
+            "é🐡b🇸🇪".into(),
+            egui::FontId::proportional(14.0),
+            Color32::WHITE,
+        );
+        let placed = hide(&mut job);
+        assert_eq!(
+            placed.iter().map(|p| (p.start, p.len)).collect::<Vec<_>>(),
+            [(1, 1), (3, 2)]
+        );
+        let hidden: Vec<bool> = job
+            .sections
+            .iter()
+            .map(|s| s.format.color == Color32::TRANSPARENT)
+            .collect();
+        assert_eq!(hidden, [false, true, false, true]);
+        let covered: usize = job
+            .sections
+            .iter()
+            .map(|s| s.byte_range.end.0 - s.byte_range.start.0)
+            .sum();
+        assert_eq!(covered, job.text.len());
+        let mut plain = egui::text::LayoutJob::simple_singleline(
+            "ascii".into(),
+            egui::FontId::proportional(14.0),
+            Color32::WHITE,
+        );
+        assert!(hide(&mut plain).is_empty());
     }
 
     #[test]

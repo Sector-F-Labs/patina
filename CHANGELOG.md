@@ -19,6 +19,10 @@ is added there in the same commit (ADR-0025).
   list, a title in a card. Nothing to change in an app.
 - `emoji::label_with(ui, text, size, style)`: `emoji::label` with the text's size and style (strong,
   weak, coloured) chosen. Nothing to change in an app.
+- `emoji::hide(&mut job) -> Vec<Placed>` and `emoji::paint_placed(painter, galley, origin, &placed)`:
+  colour emoji in a `TextEdit`. Call `hide` on the layout job your layouter makes (emoji take their
+  room, invisibly) and `paint_placed` with the edit's `galley` and `galley_pos` after it, as the
+  markdown editor does. Nothing to change in an app.
 - `tabs::keys_leaving_close(ctx, count, shown)`: `tabs::keys` without Ctrl+W, for an app that uses
   that key for something else (vim's window commands). Nothing to change in an app.
 
