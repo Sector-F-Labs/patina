@@ -473,11 +473,7 @@ pub fn keys(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction
 
 /// [`keys`] without Ctrl+W, for an app where that key means something else (vim's window
 /// commands): Ctrl+T, Ctrl+PageUp/PageDown and Alt+digits as before, and Ctrl+W left for the app.
-pub fn keys_leaving_close(
-    ctx: &egui::Context,
-    count: usize,
-    shown: usize,
-) -> Option<TabAction> {
+pub fn keys_leaving_close(ctx: &egui::Context, count: usize, shown: usize) -> Option<TabAction> {
     keys_with(ctx, count, shown, egui::Modifiers::CTRL, false)
 }
 

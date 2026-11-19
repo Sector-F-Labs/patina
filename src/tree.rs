@@ -499,7 +499,8 @@ impl FolderTree {
         let is_current = path == current;
         let icon = if is_current { "\u{1F4C2}" } else { "\u{1F4C1}" };
         let label = format!("{icon} {name}");
-        let has_children = !matches!(self.children.get(path), Some(Children::Loaded(c)) if c.is_empty());
+        let has_children =
+            !matches!(self.children.get(path), Some(Children::Loaded(c)) if c.is_empty());
         self.rows.push(Row {
             path: path.to_path_buf(),
             dir: true,
@@ -983,27 +984,55 @@ mod tests {
         }
         let at = |tree: &FolderTree| tree.kb.clone();
         nothing(&mut tree, Some(Nav::Down));
-        assert_eq!(at(&tree), Some(dir.join("sub")), "the first row is the root, then sub");
+        assert_eq!(
+            at(&tree),
+            Some(dir.join("sub")),
+            "the first row is the root, then sub"
+        );
         nothing(&mut tree, Some(Nav::Open));
         for _ in 0..100 {
             nothing(&mut tree, None);
-            if tree.rows.iter().any(|r| r.path == dir.join("sub").join("inner.rs")) {
+            if tree
+                .rows
+                .iter()
+                .any(|r| r.path == dir.join("sub").join("inner.rs"))
+            {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         nothing(&mut tree, Some(Nav::Down));
-        assert_eq!(at(&tree), Some(dir.join("sub").join("inner.rs")), "into the open folder");
+        assert_eq!(
+            at(&tree),
+            Some(dir.join("sub").join("inner.rs")),
+            "into the open folder"
+        );
         nothing(&mut tree, Some(Nav::Close));
-        assert_eq!(at(&tree), Some(dir.join("sub")), "h goes to the folder around a file");
+        assert_eq!(
+            at(&tree),
+            Some(dir.join("sub")),
+            "h goes to the folder around a file"
+        );
         nothing(&mut tree, Some(Nav::Close));
         nothing(&mut tree, None);
-        let id = tree.rows.iter().find(|r| r.path == dir.join("sub")).and_then(|r| r.folder).unwrap();
+        let id = tree
+            .rows
+            .iter()
+            .find(|r| r.path == dir.join("sub"))
+            .and_then(|r| r.folder)
+            .unwrap();
         // (Its body is drawn a moment longer, while it folds.)
-        assert!(!CollapsingState::load_with_default_open(&ctx, id, true).is_open(), "and closes it");
+        assert!(
+            !CollapsingState::load_with_default_open(&ctx, id, true).is_open(),
+            "and closes it"
+        );
         nothing(&mut tree, Some(Nav::Bottom));
         assert_eq!(at(&tree), Some(dir.join("top.rs")));
-        assert_eq!(nothing(&mut tree, Some(Nav::Activate)), Some(dir.join("top.rs")), "Enter opens a file");
+        assert_eq!(
+            nothing(&mut tree, Some(Nav::Activate)),
+            Some(dir.join("top.rs")),
+            "Enter opens a file"
+        );
         nothing(&mut tree, Some(Nav::Top));
         assert_eq!(at(&tree), Some(dir.clone()));
         let _ = std::fs::remove_dir_all(&dir);

@@ -303,6 +303,102 @@ pub fn label(ui: &mut Ui, text: &str) {
     });
 }
 
+/// One line of text laid out for painting with its emoji in colour: what a
+/// row drawn with a [`egui::Painter`] (a file's name, a notification's
+/// title) uses where [`label`] doesn't fit, because it can't be cut at a
+/// width or placed. Made with [`line`], painted with [`Line::paint`].
+pub struct Line {
+    parts: Vec<(f32, Part)>,
+    size: egui::Vec2,
+}
+
+enum Part {
+    Text(std::sync::Arc<egui::Galley>),
+    Emoji(Glyph, f32),
+}
+
+impl Line {
+    /// The line's width and height.
+    pub fn size(&self) -> egui::Vec2 {
+        self.size
+    }
+
+    /// Paints the line with its top left at `pos`; plain parts take their
+    /// colour from [`line`].
+    pub fn paint(&self, painter: &egui::Painter, pos: egui::Pos2) {
+        for (x, part) in &self.parts {
+            match part {
+                Part::Text(galley) => {
+                    let y = (self.size.y - galley.size().y) / 2.0;
+                    painter.galley(pos + vec2(*x, y), galley.clone(), Color32::PLACEHOLDER);
+                }
+                Part::Emoji(glyph, width) => {
+                    let rect = Rect::from_min_size(pos + vec2(*x, 0.0), vec2(*width, self.size.y));
+                    paint(painter, *glyph, rect);
+                }
+            }
+        }
+    }
+}
+
+/// Lays `text` out on one line in `font` and `colour`, its emoji as images
+/// the height of the line, cut with an ellipsis where it passes `max_width`
+/// (`f32::INFINITY` for no limit). Without a font installed, or without
+/// emoji in the text, it is one plain galley.
+pub fn line(
+    painter: &egui::Painter,
+    text: &str,
+    font: egui::FontId,
+    colour: Color32,
+    max_width: f32,
+) -> Line {
+    let height = painter.fonts_mut(|f| f.row_height(&font));
+    let mut parts = Vec::new();
+    let mut x = 0.0_f32;
+    let mut cut = false;
+    for run in runs(text) {
+        if cut {
+            break;
+        }
+        match run {
+            Run::Text(t) => {
+                let mut job =
+                    egui::text::LayoutJob::simple_singleline(t.to_owned(), font.clone(), colour);
+                if max_width.is_finite() {
+                    job.wrap =
+                        egui::text::TextWrapping::truncate_at_width((max_width - x).max(0.0));
+                }
+                let galley = painter.layout_job(job);
+                cut = galley.elided;
+                let width = galley.size().x;
+                parts.push((x, Part::Text(galley)));
+                x += width;
+            }
+            Run::Emoji(_, glyph) => {
+                let width = height * 1.15;
+                if x + width > max_width {
+                    let job = egui::text::LayoutJob::simple_singleline(
+                        "…".to_owned(),
+                        font.clone(),
+                        colour,
+                    );
+                    let galley = painter.layout_job(job);
+                    parts.push((x, Part::Text(galley.clone())));
+                    x += galley.size().x;
+                    cut = true;
+                } else {
+                    parts.push((x, Part::Emoji(glyph, width)));
+                    x += width;
+                }
+            }
+        }
+    }
+    Line {
+        parts,
+        size: vec2(x, height),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -364,6 +460,26 @@ mod tests {
         assert_eq!(emoji_of("👋🏽"), ["👋🏽"]);
         assert_eq!(emoji_of("🇸🇪🇬🇧"), ["🇸🇪", "🇬🇧"], "flags are pairs");
         assert_eq!(emoji_of("1\u{fe0f}\u{20e3}"), ["1\u{fe0f}\u{20e3}"]);
+    }
+
+    #[test]
+    fn a_line_is_cut_at_its_width_and_keeps_its_emoji_in_line() {
+        assert!(install(patina_emoji_font::FONT));
+        let ctx = egui::Context::default();
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            let painter = ui.painter();
+            let font = egui::FontId::proportional(14.0);
+            let white = Color32::WHITE;
+            let plain = line(painter, "plain", font.clone(), white, f32::INFINITY);
+            let with = line(painter, "plain🐡", font.clone(), white, f32::INFINITY);
+            assert!(
+                with.size().x > plain.size().x + 10.0,
+                "the emoji takes room"
+            );
+            assert_eq!(with.size().y, plain.size().y);
+            let cut = line(painter, "a long name 🐡 with more", font, white, 60.0);
+            assert!(cut.size().x <= 60.5, "{}", cut.size().x);
+        });
     }
 
     #[test]
