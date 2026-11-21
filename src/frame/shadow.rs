@@ -95,6 +95,14 @@ pub type Tile = (i32, i32, Vec<u8>);
 /// tiles to a surface of its own, as patina-shell does for a layer surface;
 /// an app with eframe's `Frame` uses [`request`].
 pub fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
+    tiles_rounded(style, 0.0)
+}
+
+/// [`tiles`] for a shape whose corners are rounded by `radius` pixels, the
+/// shadow's corners following them (a pill's shadow is round at its ends).
+/// The sides are the same: a side tile is one pixel across, so they suit a
+/// shape much longer than the blur is wide.
+pub fn tiles_rounded(style: Style, radius: f32) -> ([Tile; 8], [i32; 4]) {
     let sigma = style.blur.clamp(0.5, MOST);
     let spread = style.spread.clamp(-MOST, MOST);
     let (sx, sy) = (
@@ -161,7 +169,101 @@ pub fn tiles(style: Style) -> ([Tile; 8], [i32; 4]) {
             pixel(Some(outside_left(x)), Some(outside_bottom(y)))
         }),
     ];
+    let mut tiles = tiles;
+    if radius > 0.5 && sigma >= 1.0 {
+        // How far out a pixel is along an axis, positive outward, and where
+        // the shape's edge is on it. Tiles reach `INSET` under the window.
+        let out_left = |x: i32| (left - x) as f32 - 0.5;
+        let out_right = |x: i32| (x - INSET) as f32 + 0.5;
+        let out_top = |y: i32| (top - y) as f32 - 0.5;
+        let out_bottom = |y: i32| (y - INSET) as f32 + 0.5;
+        let (edge_left, edge_right) = (spread - sx, spread + sx);
+        let (edge_top, edge_bottom) = (spread - sy, spread + sy);
+        let r = (radius + spread).max(0.0);
+        let mut corner = |index: usize,
+                          w: i32,
+                          h: i32,
+                          ox: &dyn Fn(i32) -> f32,
+                          oy: &dyn Fn(i32) -> f32,
+                          ex: f32,
+                          ey: f32| {
+            tiles[index] = rounded_corner(
+                (w, h),
+                (ox, oy),
+                (ex, ey),
+                r,
+                sigma,
+                style.opacity,
+                [red, green, blue],
+            );
+        };
+        corner(1, wide_left, tall_top, &out_left, &out_top, edge_left, edge_top);
+        corner(3, wide_right, tall_top, &out_right, &out_top, edge_right, edge_top);
+        corner(5, wide_right, tall_bottom, &out_right, &out_bottom, edge_right, edge_bottom);
+        corner(7, wide_left, tall_bottom, &out_left, &out_bottom, edge_left, edge_bottom);
+    }
     (tiles, [left, top, right, bottom])
+}
+
+/// One corner tile of the shadow of a shape with rounded corners: the shape
+/// as a mask, blurred. `ox` and `oy` say how far out a pixel is along each
+/// axis (positive outward), `edge` where the shape ends on them, `r` its
+/// corner radius. The mask goes on past the tile by the blur's reach, as
+/// inside, so the shape's sides run on like the straight edges of a long one.
+fn rounded_corner(
+    (w, h): (i32, i32),
+    (ox, oy): (&dyn Fn(i32) -> f32, &dyn Fn(i32) -> f32),
+    (ex, ey): (f32, f32),
+    r: f32,
+    sigma: f32,
+    opacity: f32,
+    [red, green, blue]: [f32; 3],
+) -> Tile {
+    let k = (sigma * 3.0).ceil() as i32;
+    let weights: Vec<f32> = (-k..=k)
+        .map(|i| (-((i * i) as f32) / (2.0 * sigma * sigma)).exp())
+        .collect();
+    let total: f32 = weights.iter().sum();
+    let inside = |x: i32, y: i32| {
+        let (u, v) = (ox(x), oy(y));
+        if u > ex || v > ey {
+            return false;
+        }
+        let (du, dv) = (u - (ex - r), v - (ey - r));
+        du <= 0.0 || dv <= 0.0 || du * du + dv * dv <= r * r
+    };
+    let mh = (h + 2 * k) as usize;
+    // Blurred along x first, over the rows the second pass needs.
+    let mut across = vec![0f32; w as usize * mh];
+    for row in 0..mh {
+        let y = row as i32 - k;
+        for x in 0..w {
+            let mut sum = 0.0;
+            for (i, wt) in weights.iter().enumerate() {
+                if inside(x + i as i32 - k, y) {
+                    sum += wt;
+                }
+            }
+            across[row * w as usize + x as usize] = sum / total;
+        }
+    }
+    let mut bytes = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            let mut sum = 0.0;
+            for (i, wt) in weights.iter().enumerate() {
+                sum += wt * across[(y as usize + i) * w as usize + x as usize];
+            }
+            let a = (opacity * sum / total).clamp(0.0, 1.0);
+            bytes.extend_from_slice(&[
+                (blue * a).round() as u8,
+                (green * a).round() as u8,
+                (red * a).round() as u8,
+                (a * 255.0).round() as u8,
+            ]);
+        }
+    }
+    (w, h, bytes)
 }
 
 /// The complementary error function, to about 1e-7 (Numerical Recipes'
@@ -445,5 +547,23 @@ mod tests {
             ..Style::default()
         };
         assert!(tiles(huge).0.iter().all(|(w, h, _)| *w <= 400 && *h <= 400));
+    }
+
+    #[test]
+    fn a_rounded_shape_has_a_rounded_shadow() {
+        let style = Style::default();
+        let (square, offsets) = tiles(style);
+        let (round, same) = tiles_rounded(style, 22.0);
+        assert_eq!(offsets, same);
+        assert_eq!(tiles_rounded(style, 0.0).0[1], square[1]);
+        // Top left: the pixel just outside the window's square corner is dark
+        // for a square shape and light for a round one.
+        let (w, _, sq) = &square[1];
+        let (_, _, rd) = &round[1];
+        let at = |bytes: &Vec<u8>, x: i32, y: i32| bytes[((y * w + x) * 4 + 3) as usize];
+        let (left, top) = (offsets[0], offsets[1]);
+        assert!(at(rd, left, top) + 10 < at(sq, left, top));
+        // A rounded shape is inside the square one, so its shadow is nowhere darker.
+        assert!(sq.chunks(4).zip(rd.chunks(4)).all(|(s, r)| r[3] <= s[3] + 1));
     }
 }
