@@ -532,7 +532,7 @@ fn show_spans(ui: &mut egui::Ui, spans: &[Span], cell: &CellView, width: f32) ->
     };
     let job = spans_job(ui, spans, cell.header, width);
     let galley = ui.painter().layout_job(job);
-    let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+    let (rect, _) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
     ui.painter().galley(rect.min, galley.clone(), base);
     // The pointer's place, not `response.hovered()`: the cell's click area is over this
     // and takes the hover.
