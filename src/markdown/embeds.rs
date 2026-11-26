@@ -196,13 +196,15 @@ struct CellResult {
     command: Option<TableCommand>,
     /// A link in it that was clicked.
     link: Option<String>,
+    /// Shown as it looks, so the menu can offer to edit it: the cell's id.
+    rendered: Option<Id>,
 }
 
 impl CellResult {
     fn menu_command(mut self, r: usize, c: usize, table: &Table) -> Option<TableCommand> {
         if let Some(response) = self.response.take() {
             response.context_menu(|ui| {
-                if let Some(cmd) = table_menu(ui, r, c, table) {
+                if let Some(cmd) = table_menu(ui, r, c, table, self.rendered) {
                     self.command = Some(cmd);
                     ui.close();
                 }
@@ -350,16 +352,8 @@ fn show_cell(
         let area = ui.min_rect().expand2(CELL_PADDING);
         let click = ui.interact(area, cell.id.with("area"), egui::Sense::click());
         if let Some(url) = link {
-            // Read-only, a click follows it; editing, ctrl-click does, as in the text.
-            if !cell.editable || ui.input(|i| i.modifiers.command) {
-                result.link = Some(url);
-            } else if click.clicked() {
-                ui.data_mut(|d| {
-                    d.insert_temp(editing_key, true);
-                    d.insert_temp(cell.id.with("focus"), true);
-                });
-                ui.ctx().request_repaint();
-            }
+            // A click follows it, as in the text; the cell's menu has Edit Cell.
+            result.link = Some(url);
         } else if cell.editable && click.clicked() {
             ui.data_mut(|d| {
                 d.insert_temp(editing_key, true);
@@ -368,6 +362,7 @@ fn show_cell(
             ui.ctx().request_repaint();
         }
         result.response = Some(click);
+        result.rendered = Some(cell.id);
         return result;
     }
     // A &str shows the text, selectable, and edits nothing.
@@ -562,8 +557,24 @@ enum TableCommand {
     DeleteTable,
 }
 
-fn table_menu(ui: &mut egui::Ui, r: usize, c: usize, table: &Table) -> Option<TableCommand> {
+fn table_menu(
+    ui: &mut egui::Ui,
+    r: usize,
+    c: usize,
+    table: &Table,
+    rendered: Option<Id>,
+) -> Option<TableCommand> {
     let mut cmd = None;
+    if let Some(cell) = rendered {
+        if ui.button("Edit Cell").clicked() {
+            ui.data_mut(|d| {
+                d.insert_temp(cell.with("editing"), true);
+                d.insert_temp(cell.with("focus"), true);
+            });
+            ui.close();
+        }
+        ui.separator();
+    }
     if r > 0 && ui.button("Insert Row Above").clicked() {
         cmd = Some(TableCommand::InsertRow(r));
     }

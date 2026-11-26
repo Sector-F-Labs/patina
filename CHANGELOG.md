@@ -36,6 +36,14 @@ is added there in the same commit (ADR-0025).
   does. While a filter is on the same calls move through the matches. The row the keyboard is on is
   drawn selected while `set_keyboard(true)`. For an app with vim keys. Nothing to change in an app.
 
+### Changed
+
+- The markdown editor, editing, opens a link in the browser on a plain click, not only on Ctrl-click
+  (read-only it still hands the link to the app through `take_link`). To edit a link's text,
+  right-click it to put the caret there, or use the arrow keys. In a table, a link in a cell is
+  followed the same way and the cell's menu has Edit Cell. A Notebook-like app has nothing to
+  change; its users are told that a click opens a link.
+
 ### Fixed
 
 - A markdown table's cells showed their inline markdown as source (`[text](url)`, `**bold**`).

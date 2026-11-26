@@ -15,7 +15,8 @@
 //! Read-only ([`Editor::set_read_only`]) it only shows the document: text can
 //! be selected and copied, there's no caret, tasks and embeds don't change,
 //! and a click on a link hands it to the app ([`Editor::take_link`]) to
-//! follow, rather than opening it on Ctrl+click.
+//! follow. Editing, a click on a link opens it in the browser, and a
+//! right-click puts the caret in it, to edit.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -1413,7 +1414,6 @@ impl Editor {
         // Mouse.
         let pointer = ui.input(|i| i.pointer.interact_pos());
         let shift = ui.input(|i| i.modifiers.shift);
-        let command = ui.input(|i| i.modifiers.command);
         let has_selection = self.has_selection();
         let mut menu = None;
         let read_only = self.read_only;
@@ -1421,11 +1421,10 @@ impl Editor {
             resp.context_menu(|ui| context_menu(ui, has_selection, read_only, &mut menu));
         }
         below_resp.context_menu(|ui| context_menu(ui, has_selection, read_only, &mut menu));
-        // Read-only, links are followed with a plain click, so show they can be.
-        if read_only
-            && let Some(pos) = pointer
-                .filter(|_| presses.iter().any(|(_, r)| r.hovered()))
-                .and_then(|p| self.pos_at(p))
+        // Links are followed with a plain click, so show they can be.
+        if let Some(pos) = pointer
+            .filter(|_| presses.iter().any(|(_, r)| r.hovered()))
+            .and_then(|p| self.pos_at(p))
             && doc::link_at(&self.line(pos.para).spans, pos.col).is_some()
         {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -1460,7 +1459,8 @@ impl Editor {
                     let link = doc::link_at(&self.line(pos.para).spans, pos.col);
                     if read_only && let Some(url) = link {
                         self.link = Some(url);
-                    } else if command && let Some(url) = link {
+                    } else if let Some(url) = link {
+                        // Editing, a plain click opens it; right-click to put the caret in.
                         ui.ctx().open_url(egui::OpenUrl::new_tab(url));
                     } else {
                         self.move_to(pos, shift);
@@ -2369,6 +2369,57 @@ mod tests {
         let plain = screen_pos(&ed, 0, 1);
         click(&ctx, &mut ed, &mut t, plain);
         assert_eq!(ed.take_link(), None);
+    }
+
+    #[test]
+    fn editing_a_click_on_a_link_opens_it_and_a_click_elsewhere_types() {
+        let (ctx, mut ed, mut t) = unfocused("see [the docs](https://e.com/d) here\n");
+        frame(&ctx, &mut ed, &mut t, vec![]);
+        // The press frame, whose output says what was asked of the desktop.
+        let opens = |ctx: &egui::Context, ed: &mut Editor, t: &mut f64, at: Pos2| {
+            *t += 0.1;
+            let input = egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(600.0, 800.0))),
+                time: Some(*t),
+                events: vec![
+                    Event::PointerMoved(at),
+                    press(at, true, egui::PointerButton::Primary),
+                ],
+                ..Default::default()
+            };
+            let out = ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    ed.show(ui);
+                });
+            });
+            let opened = out
+                .platform_output
+                .commands
+                .iter()
+                .any(|c| matches!(c, egui::OutputCommand::OpenUrl(_)));
+            frame(
+                ctx,
+                ed,
+                t,
+                vec![press(at, false, egui::PointerButton::Primary)],
+            );
+            opened
+        };
+        let on_link = screen_pos(&ed, 0, 6);
+        assert!(
+            opens(&ctx, &mut ed, &mut t, on_link),
+            "a plain click opens the link"
+        );
+        assert_eq!(
+            ed.take_link(),
+            None,
+            "the app isn't asked: it isn't read-only"
+        );
+        // Not on the link: the caret goes there, as ever.
+        let plain = screen_pos(&ed, 0, 1);
+        assert!(!opens(&ctx, &mut ed, &mut t, plain));
+        frame(&ctx, &mut ed, &mut t, vec![type_text("X")]);
+        assert!(ed.markdown().starts_with("sXee"));
     }
 
     #[test]
