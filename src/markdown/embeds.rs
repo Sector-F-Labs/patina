@@ -534,11 +534,14 @@ fn show_spans(ui: &mut egui::Ui, spans: &[Span], cell: &CellView, width: f32) ->
     let galley = ui.painter().layout_job(job);
     let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
     ui.painter().galley(rect.min, galley.clone(), base);
-    let at = response
-        .hover_pos()
-        .map(|p| doc::link_at(spans, galley.cursor_from_pos(p - rect.min).index.0));
-    let link = at.flatten();
-    if link.is_some() && response.hovered() {
+    // The pointer's place, not `response.hovered()`: the cell's click area is over this
+    // and takes the hover.
+    let pointer = ui
+        .input(|i| i.pointer.interact_pos())
+        .filter(|p| rect.contains(*p) && ui.rect_contains_pointer(rect));
+    let link =
+        pointer.and_then(|p| doc::link_at(spans, galley.cursor_from_pos(p - rect.min).index.0));
+    if link.is_some() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         if ui.input(|i| i.pointer.primary_clicked()) {
             return link;
@@ -990,6 +993,80 @@ pub fn image_uri(src: &str, dir: Option<&Path>) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// Shows a one-cell table of `source` in a window, `frames` times, clicking
+    /// at `click` (a point in the cell, from the table's corner) on the third;
+    /// the link that came back from the click, and whether the cell is in
+    /// editing after.
+    fn click_cell(source: &str, editable: bool) -> (Option<String>, bool) {
+        let ctx = egui::Context::default();
+        super::fonts::install(&ctx);
+        let mut table = Table {
+            align: vec![Align::None],
+            rows: vec![vec![source.into()], vec!["x".into()]],
+        };
+        let at = std::cell::Cell::new(egui::Pos2::ZERO);
+        let mut link = None;
+        for frame in 0..5 {
+            let events = match frame {
+                2 => vec![
+                    egui::Event::PointerMoved(at.get()),
+                    egui::Event::PointerButton {
+                        pos: at.get(),
+                        button: egui::PointerButton::Primary,
+                        pressed: true,
+                        modifiers: Default::default(),
+                    },
+                ],
+                3 => vec![egui::Event::PointerButton {
+                    pos: at.get(),
+                    button: egui::PointerButton::Primary,
+                    pressed: false,
+                    modifiers: Default::default(),
+                }],
+                _ => vec![],
+            };
+            let input = egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(600.0, 400.0),
+                )),
+                time: Some(frame as f64 * 0.1),
+                events,
+                ..Default::default()
+            };
+            let _ = ctx.run_ui(input, |ui| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    let origin = ui.available_rect_before_wrap().min;
+                    // Inside the first cell, over its first characters.
+                    at.set(origin + CELL_PADDING + egui::vec2(6.0, 8.0));
+                    let out = super::table(ui, &mut table, None, Id::new("t"), editable);
+                    link = out.link.or(link.take());
+                });
+            });
+        }
+        let editing = ctx.data(|d| {
+            d.get_temp::<bool>(Id::new("t").with((0usize, 0usize)).with("editing"))
+                .unwrap_or(false)
+        });
+        (link, editing)
+    }
+
+    #[test]
+    fn a_click_on_a_link_in_a_cell_follows_it_and_does_not_edit() {
+        for editable in [true, false] {
+            let (link, editing) = click_cell("[docs](https://e.com/d)", editable);
+            assert_eq!(
+                link.as_deref(),
+                Some("https://e.com/d"),
+                "editable {editable}"
+            );
+            assert!(!editing, "editable {editable}");
+        }
+        // Over plain markup, a click edits when it can.
+        let (link, editing) = click_cell("**bold** text", true);
+        assert_eq!((link, editing), (None, true));
+    }
+
     #[test]
     fn a_cells_markup_shows_and_its_links_are_found() {
         let spans = inline_spans("see [the docs](https://e.com/d) and **this**").unwrap();
