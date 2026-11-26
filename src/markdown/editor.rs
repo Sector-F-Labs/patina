@@ -1385,6 +1385,13 @@ impl Editor {
                     }
                     Para::Text(_) => unreachable!(),
                 };
+                if let Some(url) = response.link {
+                    if self.read_only {
+                        self.link = Some(url);
+                    } else {
+                        ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+                    }
+                }
                 if response.changed {
                     embed_edits.push((i, original));
                 }

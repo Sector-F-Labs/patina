@@ -13,6 +13,8 @@ is added there in the same commit (ADR-0025).
 
 ### Added
 
+- The gallery has a Markdown section (`make gallery` builds it with the `markdown` feature): a
+  read-only document with a table, links, a list, a quote and code. Nothing to change in an app.
 - `emoji::line(painter, text, font, colour, max_width) -> Line`: one line of text for a row drawn
   with a painter, its emoji in colour and the text cut with an ellipsis at `max_width`;
   `Line::size()` and `Line::paint(painter, pos)`. For where `emoji::label` doesn't fit: a name in a
@@ -36,6 +38,11 @@ is added there in the same commit (ADR-0025).
 
 ### Fixed
 
+- A markdown table's cells showed their inline markdown as source (`[text](url)`, `**bold**`).
+  They show as it looks now: links, bold, italic, code and strike-through, until the cell is
+  clicked to edit it. A link follows on a click when the editor is read-only (`Editor::take_link`)
+  and on Ctrl-click while editing, as in the text. Columns are sized by what shows. Nothing to
+  change in an app.
 - A menu item with a check or a radio and a shortcut (`Entry::item(..).check(..).shortcut(..)`) showed no
   shortcut in the window's menus: its text was left out. It is a flat button lit when on now, with the
   shortcut at its right. Items without a shortcut keep their checkbox or radio. Nothing to change in an app.

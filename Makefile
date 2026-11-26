@@ -8,11 +8,11 @@ help: ## Show this help
 	@awk 'BEGIN { FS = ":.*## " } /^[a-z-]+:.*## / { printf "  \033[1m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 gallery: ## Show every component in the gallery example
-	cargo run --example gallery
+	cargo run --features markdown --example gallery
 
 dev: ## Run the gallery with live reload (requires cargo-watch)
 	@command -v cargo-watch >/dev/null 2>&1 || { echo "cargo-watch is required: cargo install cargo-watch"; exit 1; }
-	cargo watch -x "run --example gallery"
+	cargo watch -x "run --features markdown --example gallery"
 
 build: ## Build the library and the gallery
 	cargo build --all-targets
@@ -28,9 +28,9 @@ doc: ## Build the API docs and open them
 
 # The docs screenshots, light and dark, with the tree rooted at this repo.
 screenshot: ## Regenerate the docs/gallery-*.png screenshots
-	PATINA_ROOT=$(CURDIR) PATINA_SKIN=light PATINA_SCREENSHOT=docs/gallery-light.png cargo run --example gallery
-	PATINA_ROOT=$(CURDIR) PATINA_SKIN=dark PATINA_SCREENSHOT=docs/gallery-dark.png cargo run --example gallery
-	PATINA_ROOT=$(CURDIR) PATINA_SKIN="Dark Orange" PATINA_SCREENSHOT=docs/gallery-dark-orange.png cargo run --example gallery
+	PATINA_ROOT=$(CURDIR) PATINA_SKIN=light PATINA_SCREENSHOT=docs/gallery-light.png cargo run --features markdown --example gallery
+	PATINA_ROOT=$(CURDIR) PATINA_SKIN=dark PATINA_SCREENSHOT=docs/gallery-dark.png cargo run --features markdown --example gallery
+	PATINA_ROOT=$(CURDIR) PATINA_SKIN="Dark Orange" PATINA_SCREENSHOT=docs/gallery-dark-orange.png cargo run --features markdown --example gallery
 
 clean: ## Remove build output
 	cargo clean

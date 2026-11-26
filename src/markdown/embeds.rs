@@ -7,7 +7,9 @@ use std::path::Path;
 
 use egui::{Id, RichText};
 
-use super::model::{Align, CellPart, Image, Table, cell_parts};
+use super::doc;
+use super::fonts;
+use super::model::{Align, CellPart, Image, Inline, Span, Table, cell_parts};
 
 /// Images are shown at their own size, scaled down to fit the column and,
 /// for tall ones, this height.
@@ -18,6 +20,8 @@ pub struct EmbedResponse {
     pub changed: bool,
     /// The user asked to remove the whole table or code block.
     pub delete: bool,
+    /// A link in a cell the user clicked, for the editor to hand on.
+    pub link: Option<String>,
 }
 
 /// Languages offered for code blocks; any other fence tag is kept and shown.
@@ -112,6 +116,7 @@ pub fn table(
             };
             let changed_by = show_cell(&mut cell_ui, &row_cells[c], &mut table.rows[r][c], &cell);
             out.changed |= changed_by.changed;
+            out.link = changed_by.link.clone().or(out.link.take());
             if let Some(cmd) = changed_by.menu_command(r, c, table) {
                 command = Some(cmd);
             }
@@ -189,6 +194,8 @@ struct CellResult {
     /// The cell's response, for its context menu.
     response: Option<egui::Response>,
     command: Option<TableCommand>,
+    /// A link in it that was clicked.
+    link: Option<String>,
 }
 
 impl CellResult {
@@ -217,6 +224,7 @@ fn content_width(
     parts: &[CellPart],
     source: &str,
     dir: Option<&Path>,
+    header: bool,
 ) -> (f32, f32) {
     let font = cell_text_font(ui);
     let color = ui.visuals().text_color();
@@ -231,13 +239,27 @@ fn content_width(
         let least = text.split_whitespace().map(&measure).fold(0.0, f32::max);
         (least, most)
     };
-    if !parts.iter().any(|p| matches!(p, CellPart::Image(_))) {
+    let marked_up = parts
+        .iter()
+        .any(|p| matches!(p, CellPart::Text(t) if inline_spans(t).is_some()));
+    if !marked_up && !parts.iter().any(|p| matches!(p, CellPart::Image(_))) {
         // What shows is the source itself.
         return text_width(source);
     }
     parts.iter().fold((0.0, 0.0), |(least, most), part| {
         let (l, m) = match part {
-            CellPart::Text(text) => text_width(text),
+            CellPart::Text(text) => match inline_spans(text) {
+                // As it's shown: its markup isn't, and its font is the note font.
+                Some(spans) => {
+                    let wide = |width: f32| {
+                        let job = spans_job(ui, &spans, header, width);
+                        ui.painter().layout_job(job).size().x
+                    };
+                    // Wrapped at nothing, each line is its longest word.
+                    (wide(1.0), wide(f32::INFINITY))
+                }
+                None => text_width(text),
+            },
             CellPart::Image(image) => {
                 let natural =
                     natural_size(ui.ctx(), &image_uri(&image.src, dir)).unwrap_or(PENDING_IMAGE);
@@ -262,9 +284,9 @@ fn column_widths(
     let pad = 2.0 * CELL_PADDING.x;
     let mut least = vec![MIN_COLUMN; columns];
     let mut most = vec![MIN_COLUMN; columns];
-    for (row, sources) in cells.iter().zip(sources) {
+    for (r, (row, sources)) in cells.iter().zip(sources).enumerate() {
         for (c, parts) in row.iter().enumerate() {
-            let (l, m) = content_width(ui, parts, &sources[c], dir);
+            let (l, m) = content_width(ui, parts, &sources[c], dir, r == 0);
             least[c] = least[c].max(l + pad);
             most[c] = most[c].max(m + pad);
         }
@@ -315,14 +337,30 @@ fn show_cell(
 ) -> CellResult {
     let mut result = CellResult::default();
     let width = ui.available_width();
+    // Images and inline markup show as they look until the cell is clicked.
     let has_images = parts.iter().any(|p| matches!(p, CellPart::Image(_)));
+    let shown_rendered = has_images
+        || parts
+            .iter()
+            .any(|p| matches!(p, CellPart::Text(t) if inline_spans(t).is_some()));
     let editing_key = cell.id.with("editing");
     let mut editing: bool = ui.data(|d| d.get_temp(editing_key)).unwrap_or(false);
-    if has_images && !editing {
-        show_parts(ui, parts, cell, width);
+    if shown_rendered && !editing {
+        let link = show_parts(ui, parts, cell, width);
         let area = ui.min_rect().expand2(CELL_PADDING);
         let click = ui.interact(area, cell.id.with("area"), egui::Sense::click());
-        if cell.editable && click.clicked() {
+        if let Some(url) = link {
+            // Read-only, a click follows it; editing, ctrl-click does, as in the text.
+            if !cell.editable || ui.input(|i| i.modifiers.command) {
+                result.link = Some(url);
+            } else if click.clicked() {
+                ui.data_mut(|d| {
+                    d.insert_temp(editing_key, true);
+                    d.insert_temp(cell.id.with("focus"), true);
+                });
+                ui.ctx().request_repaint();
+            }
+        } else if cell.editable && click.clicked() {
             ui.data_mut(|d| {
                 d.insert_temp(editing_key, true);
                 d.insert_temp(cell.id.with("focus"), true);
@@ -350,7 +388,7 @@ fn show_cell(
     }
     let response = ui.add(edit);
     result.changed = response.changed();
-    if has_images && cell.editable {
+    if shown_rendered && cell.editable {
         let focus_wanted: bool = ui
             .data(|d| d.get_temp(cell.id.with("focus")))
             .unwrap_or(false);
@@ -368,11 +406,22 @@ fn show_cell(
     result
 }
 
-/// A cell's text and images, one under another.
-fn show_parts(ui: &mut egui::Ui, parts: &[CellPart], cell: &CellView, width: f32) {
+/// A cell's text and images, one under another; the link in its text that
+/// was clicked, if one was.
+fn show_parts(
+    ui: &mut egui::Ui,
+    parts: &[CellPart],
+    cell: &CellView,
+    width: f32,
+) -> Option<String> {
+    let mut followed = None;
     for part in parts {
         match part {
             CellPart::Text(text) => {
+                if let Some(spans) = inline_spans(text) {
+                    followed = show_spans(ui, &spans, cell, width).or(followed);
+                    continue;
+                }
                 let mut rich = RichText::new(text);
                 if cell.header {
                     rich = rich.color(ui.visuals().strong_text_color());
@@ -413,6 +462,94 @@ fn show_parts(ui: &mut egui::Ui, parts: &[CellPart], cell: &CellView, width: f32
             }
         }
     }
+    followed
+}
+
+/// The inline markdown of `text` as spans, when it has any markup to show
+/// (bold, a link, code...); `None` for plain text, and for what isn't a
+/// single paragraph (a list marker or heading is left as typed).
+fn inline_spans(text: &str) -> Option<Vec<Span>> {
+    use super::model::{Block, parse};
+    let lines = parse(text);
+    let [line] = lines.as_slice() else {
+        return None;
+    };
+    (line.block == Block::Paragraph && line.spans.iter().any(|s| !s.styles.is_empty()))
+        .then(|| line.spans.clone())
+}
+
+/// Spans as a layout job: the look a cell's markup is shown in, and what its
+/// width is measured by. Wrapped at `width`.
+fn spans_job(ui: &egui::Ui, spans: &[Span], header: bool, width: f32) -> egui::text::LayoutJob {
+    let v = ui.visuals();
+    let size = cell_text_font(ui).size;
+    let base = if header {
+        v.strong_text_color()
+    } else {
+        v.text_color()
+    };
+    let mut job = egui::text::LayoutJob::default();
+    job.wrap.max_width = width;
+    for span in spans {
+        let styles = &span.styles;
+        let italic = styles.contains(&Inline::Italic);
+        let bold = header || styles.contains(&Inline::Bold);
+        let code = styles
+            .iter()
+            .any(|s| matches!(s, Inline::Code | Inline::Raw));
+        let mut f = if code {
+            egui::TextFormat {
+                font_id: egui::FontId::monospace(size - 1.5),
+                color: base,
+                background: if styles.contains(&Inline::Code) {
+                    v.code_bg_color
+                } else {
+                    egui::Color32::TRANSPARENT
+                },
+                ..Default::default()
+            }
+        } else {
+            egui::TextFormat {
+                font_id: fonts::note(size, italic),
+                coords: fonts::weight(bold),
+                color: base,
+                ..Default::default()
+            }
+        };
+        if styles.contains(&Inline::Strike) {
+            f.strikethrough = egui::Stroke::new(1.0, f.color);
+        }
+        if styles.iter().any(|s| matches!(s, Inline::Link(_))) {
+            f.color = v.hyperlink_color;
+            f.underline = egui::Stroke::new(1.0, v.hyperlink_color);
+        }
+        job.append(&span.text, 0.0, f);
+    }
+    job
+}
+
+/// Spans laid out as they look; the URL of the link in them clicked, if any.
+fn show_spans(ui: &mut egui::Ui, spans: &[Span], cell: &CellView, width: f32) -> Option<String> {
+    let base = if cell.header {
+        ui.visuals().strong_text_color()
+    } else {
+        ui.visuals().text_color()
+    };
+    let job = spans_job(ui, spans, cell.header, width);
+    let galley = ui.painter().layout_job(job);
+    let (rect, response) = ui.allocate_exact_size(galley.size(), egui::Sense::hover());
+    ui.painter().galley(rect.min, galley.clone(), base);
+    let at = response
+        .hover_pos()
+        .map(|p| doc::link_at(spans, galley.cursor_from_pos(p - rect.min).index.0));
+    let link = at.flatten();
+    if link.is_some() && response.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        if ui.input(|i| i.pointer.primary_clicked()) {
+            return link;
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -842,6 +979,18 @@ pub fn image_uri(src: &str, dir: Option<&Path>) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_cells_markup_shows_and_its_links_are_found() {
+        let spans = inline_spans("see [the docs](https://e.com/d) and **this**").unwrap();
+        assert_eq!(doc::plain(&spans), "see the docs and this");
+        // Over "the docs", but not "see".
+        assert_eq!(doc::link_at(&spans, 6).as_deref(), Some("https://e.com/d"));
+        assert_eq!(doc::link_at(&spans, 1), None);
+        // Plain text, and what isn't a paragraph, is left as typed.
+        assert_eq!(inline_spans("just words"), None);
+        assert_eq!(inline_spans("- **item**"), None);
+    }
+
     use super::*;
 
     #[test]

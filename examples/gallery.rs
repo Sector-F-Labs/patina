@@ -38,6 +38,31 @@ fn main() -> eframe::Result {
     )
 }
 
+/// What the Markdown section shows: a little of everything, tables with
+/// links and styled text in their cells included.
+#[cfg(feature = "markdown")]
+const MARKDOWN: &str = "\
+A paragraph with **bold**, *italic*, `code`, ~~strike~~ and a [link](https://github.com/Sector-F-Labs/patina).
+
+- A list
+- [x] with a finished task
+- [ ] and one to do
+
+> A quote.
+
+| Component | Where | Notes |
+| :-- | :-- | --: |
+| Frame | [patina::frame](https://docs.rs/patina-ui) | **title bar**, edges |
+| Tabs | `patina::tabs` | *closable* |
+| Markdown | [patina::markdown](https://docs.rs/patina-ui) | cells render their markdown |
+
+```rust
+fn main() {
+    println!(\"highlighted code\");
+}
+```
+";
+
 struct Gallery {
     custom_frame: bool,
     /// Zoom in percent, and whether the sidebar shows, from the View menu.
@@ -65,6 +90,9 @@ struct Gallery {
     value: f32,
     checked: bool,
     choice: usize,
+    /// The Markdown section: a read-only document (`--features markdown`).
+    #[cfg(feature = "markdown")]
+    markdown: patina::markdown::Editor,
     /// Where to save a screenshot, and whether one has been asked for.
     screenshot: Option<(PathBuf, bool)>,
 }
@@ -87,6 +115,14 @@ impl Gallery {
         let label = root
             .file_name()
             .map_or("/".into(), |n| n.to_string_lossy().into_owned());
+        #[cfg(feature = "markdown")]
+        let markdown = {
+            patina::markdown::install(&cc.egui_ctx);
+            let mut editor = patina::markdown::Editor::new(egui::Id::new("gallery-markdown"));
+            editor.load(MARKDOWN);
+            editor.set_read_only(true);
+            editor
+        };
         let gallery = Self {
             custom_frame: true,
             zoom: 100,
@@ -106,6 +142,8 @@ impl Gallery {
             value: 0.4,
             checked: true,
             choice: 0,
+            #[cfg(feature = "markdown")]
+            markdown,
             screenshot: std::env::var_os("PATINA_SCREENSHOT").map(|p| (PathBuf::from(p), false)),
         };
         gallery.apply_skin(&cc.egui_ctx);
@@ -436,6 +474,19 @@ impl Gallery {
         ui.add_space(16.0);
         ui.heading("Folder tree");
         ui.label(format!("Selected: {}", self.current.display()));
+        #[cfg(feature = "markdown")]
+        {
+            ui.add_space(16.0);
+            ui.heading("Markdown");
+            ui.label(
+                "patina::markdown shows a document: headings, lists, tables, code and images.",
+            );
+            ui.add_space(8.0);
+            self.markdown.show(ui);
+            if let Some(url) = self.markdown.take_link() {
+                ui.ctx().open_url(egui::OpenUrl::new_tab(url));
+            }
+        }
     }
 }
 
@@ -598,7 +649,9 @@ impl eframe::App for Gallery {
 
         egui::CentralPanel::default()
             .frame(egui::Frame::central_panel(ui.style()))
-            .show(ui, |ui| self.widgets(ui));
+            .show(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| self.widgets(ui));
+            });
 
         if self.custom_frame {
             frame::edges(&ctx, radius, style.border);
