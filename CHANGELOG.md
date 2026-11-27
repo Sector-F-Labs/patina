@@ -13,6 +13,9 @@ is added there in the same commit (ADR-0025).
 
 ### Added
 
+- `frame::shadow::request` works on FreeBSD too, where it asked for nothing: the window's shadow was
+  gated on Linux, though it's only the Wayland protocol and `memfd_create`, which FreeBSD has. Nothing
+  to change in an app.
 - The gallery has a Markdown section (`make gallery` builds it with the `markdown` feature): a
   read-only document with a table, links, a list, a quote and code. Nothing to change in an app.
 - `emoji::line(painter, text, font, colour, max_width) -> Line`: one line of text for a row drawn

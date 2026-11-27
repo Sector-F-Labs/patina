@@ -58,7 +58,7 @@ impl Default for Style {
 const MOST: f32 = 64.0;
 
 /// Asks the compositor to draw `window`'s shadow, in the default [`Style`].
-/// Does nothing on other systems than Linux on Wayland, with a compositor
+/// Does nothing on other systems than Linux and FreeBSD on Wayland, with a compositor
 /// that has no shadow protocol, or once it has been asked for this window.
 pub fn request(window: &(impl HasWindowHandle + HasDisplayHandle)) {
     request_styled(window, Style::default());
@@ -66,9 +66,9 @@ pub fn request(window: &(impl HasWindowHandle + HasDisplayHandle)) {
 
 /// [`request`], in `style`.
 pub fn request_styled(window: &(impl HasWindowHandle + HasDisplayHandle), style: Style) {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     wayland::request(window, style);
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
     let _ = (window, style);
 }
 
@@ -268,7 +268,7 @@ fn rounded_corner(
 
 /// The complementary error function, to about 1e-7 (Numerical Recipes'
 /// Chebyshev fit).
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "linux", target_os = "freebsd")), allow(dead_code))]
 fn erfc(x: f64) -> f64 {
     let z = x.abs();
     let t = 1.0 / (1.0 + 0.5 * z);
@@ -291,7 +291,7 @@ fn erfc(x: f64) -> f64 {
     if x >= 0.0 { r } else { 2.0 - r }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 mod wayland {
     use std::collections::HashSet;
     use std::io::Write;
